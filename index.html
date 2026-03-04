@@ -1595,35 +1595,42 @@ canvas.addEventListener('mousemove', e => {
     return;
   }
 
-  // ── Drag (move) ──────────────────────────────────────
-  if (state.dragging) {
+  // ── Group drag (move) ───────────────────────────────────
+  if (state.dragGroup) {
     const pos = canvasPos(e);
-    const w = toWorld(pos.x, pos.y);
-    let nx = w.x - state.dragOff.x;
-    let ny = w.y - state.dragOff.y;
-    // Snap to grid — toggle with snap button; shift key temporarily inverts
+    const w   = toWorld(pos.x, pos.y);
+    const dx = w.x - state.dragStart.x;
+    const dy = w.y - state.dragStart.y;
     const doSnap = state.snapEnabled !== e.shiftKey;
-    if (doSnap) {
-      const snap = 10;
-      nx = Math.round(nx / snap) * snap;
-      ny = Math.round(ny / snap) * snap;
-    }
-    state.dragging.x = nx;
-    state.dragging.y = ny;
+    state.dragGroup.forEach(({ item, ox, oy }) => {
+      let nx = ox + dx, ny = oy + dy;
+      if (doSnap) { const s = 10; nx = Math.round(nx/s)*s; ny = Math.round(ny/s)*s; }
+      item.x = nx;
+      item.y = ny;
+    });
     render();
     updatePropsPanel();
     return;
   }
 
-  // ── Cursor feedback ───────────────────────────────────
+  // ── Lasso ──────────────────────────────────────────────
+  if (state.lasso) {
+    const pos = canvasPos(e);
+    const w   = toWorld(pos.x, pos.y);
+    state.lasso.x2 = w.x;
+    state.lasso.y2 = w.y;
+    render();
+    return;
+  }
+
+  // ── Cursor feedback ─────────────────────────────────────
   const pos = canvasPos(e);
   const w = toWorld(pos.x, pos.y);
-  const hh = getHandleAt(w.x, w.y);
-  if (hh) {
-    canvas.style.cursor = HANDLE_DEFS[hh.key].cursor;
-  } else {
-    canvas.style.cursor = getItemAt(w.x, w.y) ? 'grab' : 'default';
+  if (state.selection.size === 1) {
+    const hh = getHandleAt(w.x, w.y);
+    if (hh) { canvas.style.cursor = HANDLE_DEFS[hh.key].cursor; return; }
   }
+  canvas.style.cursor = getItemAt(w.x, w.y) ? 'grab' : 'default';
 });
 
 canvas.addEventListener('mouseup', e => {
