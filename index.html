@@ -519,6 +519,9 @@
               <rect x="5" y="5" width="34" height="34" fill="url(#wallHatch)" clip-path="url(#wallClip)" opacity="0.5"/>
               <rect x="5" y="5" width="34" height="34" fill="url(#wallHatch2)" clip-path="url(#wallClip)" opacity="0.5"/>
               <rect x="5" y="5" width="34" height="34" fill="none" stroke="#3d3028" stroke-width="2"/>
+              <!-- prohibition symbol -->
+              <circle cx="22" cy="22" r="9" fill="none" stroke="rgba(160,40,30,0.6)" stroke-width="2.2"/>
+              <line x1="28.4" y1="15.6" x2="15.6" y2="28.4" stroke="rgba(160,40,30,0.6)" stroke-width="2.2" stroke-linecap="round"/>
             </svg>
             <span class="furniture-item-label">Wall</span>
           </div>
@@ -1327,15 +1330,24 @@ function drawWall(item) {
   ctx.strokeStyle = '#3d3028';
   ctx.lineWidth = 2;
   ctx.strokeRect(-hw, -hh, item.w, item.h);
-  // "WALL" label centred
-  const fontSize = Math.max(8, Math.min(item.w * 0.14, 16));
-  if (fontSize * state.scale >= 7) {
+  // Prohibition symbol (circle + slash) centred in the area
+  const minDim = Math.min(item.w, item.h);
+  const r = Math.max(8, minDim * 0.22);
+  if (r * state.scale >= 6) {
     ctx.save();
-    ctx.font = `600 ${fontSize}px "DM Mono", monospace`;
-    ctx.fillStyle = 'rgba(60,48,36,0.45)';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('WALL', 0, 0);
+    ctx.strokeStyle = 'rgba(160, 40, 30, 0.55)';
+    ctx.lineWidth = Math.max(1.5, r * 0.18);
+    ctx.lineCap = 'round';
+    // Circle
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.stroke();
+    // Diagonal slash (top-right to bottom-left)
+    const sl = r * 0.72;
+    ctx.beginPath();
+    ctx.moveTo( sl, -sl);
+    ctx.lineTo(-sl,  sl);
+    ctx.stroke();
     ctx.restore();
   }
 }
