@@ -627,18 +627,22 @@ let ctx = canvas.getContext('2d');
 let state = {
   items: [],
   room: { w: 800, h: 600 },
-  selected: null,
+  selected: null,       // single-item ref (props panel / handles)
+  selection: new Set(), // Set of item ids
   nextId: 1,
   pan: { x: 0, y: 0 },
   scale: 1,
   dragging: null,
   dragOff: { x: 0, y: 0 },
+  dragGroup: null,   // [{item, ox, oy}] for multi-drag
+  dragStart: null,   // {x,y} world start for group drag
   panDragging: false,
   panStart: { x: 0, y: 0 },
   panOrigin: { x: 0, y: 0 },
   dropType: null,
   snapEnabled: true,
   resizing: null,   // { handle, origCX, origCY, origHW, origHH, startLocal }
+  lasso: null,      // { x1,y1,x2,y2 } world coords while drawing
 };
 
 const FURNITURE = {
@@ -652,11 +656,34 @@ const FURNITURE = {
   'bar':          { label:'Bar Counter',  w:160, h:50,  seats:0,  color:'#c8a87a' },
 };
 
+// ════════════════════════════════════════════
+// SELECTION HELPERS
+// ════════════════════════════════════════════
+function selectionItems() {
+  return state.items.filter(i => state.selection.has(i.id));
+}
+function setSelection(items) {
+  state.selection = new Set(items.map(i => i.id));
+  state.selected  = items.length === 1 ? items[0] : null;
+}
+function addToSelection(item) {
+  state.selection.add(item.id);
+  state.selected = state.selection.size === 1 ? item : null;
+}
+function removeFromSelection(item) {
+  state.selection.delete(item.id);
+  const sel = selectionItems();
+  state.selected = sel.length === 1 ? sel[0] : null;
+}
+function clearSelection() {
+  state.selection.clear();
+  state.selected = null;
+}
+
+
+
 const CHAIR_COLORS = ['#e0d8c8','#c8d4e0','#d4e0c8','#e0c8c8','#e0d8b0','#c8c8d8'];
 const TABLE_COLORS = ['#c8bfad','#b8c4c0','#c4bcb0','#c0c8b8','#c8b8b0','#b0bcbc'];
-
-// ════════════════════════════════════════════
-// CANVAS SETUP & RESIZE
 // ════════════════════════════════════════════
 function resizeCanvas() {
   const wrap = document.getElementById('canvasWrap');
@@ -748,7 +775,25 @@ function render() {
   // Items (back to front by y)
   const sorted = [...state.items].sort((a,b) => a.y - b.y);
   for (const item of sorted) {
-    drawItem(item, item === state.selected);
+    drawItem(item, state.selection.has(item.id));
+  }
+
+  // Lasso rubber-band
+  if (state.lasso) {
+    const l = state.lasso;
+    const s1 = toCanvas(l.x1, l.y1), s2 = toCanvas(l.x2, l.y2);
+    const lx = Math.min(s1.x, s2.x), ly = Math.min(s1.y, s2.y);
+    const lw = Math.abs(s2.x - s1.x), lh = Math.abs(s2.y - s1.y);
+    ctx.save();
+    ctx.setTransform(1,0,0,1,0,0); // screen space
+    ctx.strokeStyle = '#8b3a1a';
+    ctx.lineWidth   = 1.5;
+    ctx.setLineDash([5, 3]);
+    ctx.strokeRect(lx, ly, lw, lh);
+    ctx.fillStyle = 'rgba(139,58,26,0.06)';
+    ctx.fillRect(lx, ly, lw, lh);
+    ctx.setLineDash([]);
+    ctx.restore();
   }
 
   // Room label (watermark)
@@ -864,8 +909,8 @@ function drawItem(item, selected) {
     }
     ctx.setLineDash([]);
     ctx.restore();
-    // Drag handles
-    drawHandles(item);
+    // Drag handles — only when single item selected
+    if (state.selection.size === 1) drawHandles(item);
   }
 
   // Draw by type
@@ -1266,9 +1311,10 @@ function getItemAt(wx, wy) {
 }
 
 function deleteSelected() {
-  if (!state.selected) return;
-  state.items = state.items.filter(i => i !== state.selected);
-  state.selected = null;
+  if (state.selection.size === 0) return;
+  const ids = state.selection;
+  state.items = state.items.filter(i => !ids.has(i.id));
+  clearSelection();
   updatePropsPanel();
   render();
 }
@@ -1278,11 +1324,22 @@ function deleteSelected() {
 // ════════════════════════════════════════════
 function updatePropsPanel() {
   const el = document.getElementById('propsContent');
-  const item = state.selected;
-  if (!item) {
+  const sel = selectionItems();
+  if (sel.length === 0) {
     el.innerHTML = '<div class="no-selection">Select an item<br>to edit its properties</div>';
     return;
   }
+  if (sel.length > 1) {
+    el.innerHTML = `
+      <div style="font-size:11px;color:var(--ink-soft);line-height:1.8;">
+        <strong>${sel.length}</strong> items selected<br>
+        <span style="color:var(--ink-faint);font-size:10px;">Arrow keys to move group<br>R to rotate all · D to duplicate<br>Del to remove all</span>
+      </div>
+      <button class="btn delete-btn" onclick="deleteSelected()">✕ Remove all</button>
+    `;
+    return;
+  }
+  const item = sel[0];
   const def = FURNITURE[item.type];
   const colorPalette = item.type.startsWith('table') ? TABLE_COLORS : CHAIR_COLORS;
   el.innerHTML = `
@@ -1315,8 +1372,9 @@ function updatePropsPanel() {
 }
 
 function setProp(key, val) {
-  if (!state.selected) return;
-  state.selected[key] = val;
+  const item = state.selected;
+  if (!item) return;
+  item[key] = val;
   render();
   if (key === 'color') updatePropsPanel();
 }
@@ -1426,9 +1484,8 @@ document.querySelectorAll('.furniture-item').forEach(el => {
 // ════════════════════════════════════════════
 canvas.addEventListener('mousedown', e => {
   if (e.button === 1 || (e.button === 0 && e.altKey)) {
-    // Pan
     state.panDragging = true;
-    state.panStart = { x: e.clientX, y: e.clientY };
+    state.panStart  = { x: e.clientX, y: e.clientY };
     state.panOrigin = { ...state.pan };
     canvas.style.cursor = 'grabbing';
     return;
@@ -1436,33 +1493,55 @@ canvas.addEventListener('mousedown', e => {
   const pos = canvasPos(e);
   const w   = toWorld(pos.x, pos.y);
 
-  // Check resize handles on selected item first
-  const handleHit = getHandleAt(w.x, w.y);
-  if (handleHit) {
-    const it = handleHit.item;
-    state.resizing = {
-      handle:    handleHit.key,
-      origCX:    it.x + it.w / 2,
-      origCY:    it.y + it.h / 2,
-      origHW:    it.w / 2,
-      origHH:    it.h / 2,
-      startLocal: worldToItemLocal(w.x, w.y, it),
-    };
-    canvas.style.cursor = HANDLE_DEFS[handleHit.key].cursor;
-    return;
+  // ── Resize handle on the single selected item? ──
+  if (state.selection.size === 1) {
+    const handleHit = getHandleAt(w.x, w.y);
+    if (handleHit) {
+      const it = handleHit.item;
+      state.resizing = {
+        handle:     handleHit.key,
+        origCX:     it.x + it.w / 2,
+        origCY:     it.y + it.h / 2,
+        origHW:     it.w / 2,
+        origHH:     it.h / 2,
+        startLocal: worldToItemLocal(w.x, w.y, it),
+      };
+      canvas.style.cursor = HANDLE_DEFS[handleHit.key].cursor;
+      return;
+    }
   }
 
   const hit = getItemAt(w.x, w.y);
+
   if (hit) {
-    state.selected = hit;
-    state.dragging = hit;
-    state.dragOff = { x: w.x - hit.x, y: w.y - hit.y };
+    if (e.shiftKey) {
+      // Shift-click: toggle membership
+      if (state.selection.has(hit.id)) {
+        removeFromSelection(hit);
+      } else {
+        addToSelection(hit);
+      }
+      updatePropsPanel();
+      render();
+      return;
+    }
+
+    // Plain click: if item already in selection, keep group and start drag.
+    // If not in selection, replace selection with just this item.
+    if (!state.selection.has(hit.id)) {
+      setSelection([hit]);
+    }
+
+    // Start group drag for ALL selected items
+    state.dragStart = { x: w.x, y: w.y };
+    state.dragGroup = selectionItems().map(it => ({ item: it, ox: it.x, oy: it.y }));
     canvas.style.cursor = 'grabbing';
     updatePropsPanel();
     render();
   } else {
-    state.selected = null;
-    state.resizing = null;
+    // Click on empty space — clear selection and start lasso
+    if (!e.shiftKey) clearSelection();
+    state.lasso = { x1: w.x, y1: w.y, x2: w.x, y2: w.y };
     updatePropsPanel();
     render();
   }
@@ -1545,17 +1624,43 @@ canvas.addEventListener('mousemove', e => {
   }
 });
 
-canvas.addEventListener('mouseup', () => {
-  state.dragging = null;
+canvas.addEventListener('mouseup', e => {
+  // Finalise lasso selection
+  if (state.lasso) {
+    const l = state.lasso;
+    const x1 = Math.min(l.x1, l.x2), x2 = Math.max(l.x1, l.x2);
+    const y1 = Math.min(l.y1, l.y2), y2 = Math.max(l.y1, l.y2);
+    const THRESH = 4 / state.scale; // ignore tiny accidental lassos
+    if (x2 - x1 > THRESH || y2 - y1 > THRESH) {
+      const inside = state.items.filter(it => {
+        const cx = it.x + it.w / 2, cy = it.y + it.h / 2;
+        return cx >= x1 && cx <= x2 && cy >= y1 && cy <= y2;
+      });
+      if (e.shiftKey) {
+        inside.forEach(it => addToSelection(it));
+      } else {
+        setSelection(inside);
+      }
+      updatePropsPanel();
+    }
+    state.lasso = null;
+    render();
+  }
+  state.dragging    = null;
+  state.dragGroup   = null;
+  state.dragStart   = null;
   state.panDragging = false;
-  state.resizing = null;
+  state.resizing    = null;
   canvas.style.cursor = 'default';
   updateItemToolbar();
 });
 canvas.addEventListener('mouseleave', () => {
-  state.dragging = null;
+  state.dragging    = null;
+  state.dragGroup   = null;
+  state.dragStart   = null;
   state.panDragging = false;
-  state.resizing = null;
+  state.resizing    = null;
+  state.lasso       = null;
 });
 
 // Scroll to zoom
@@ -1583,52 +1688,47 @@ canvas.addEventListener('dblclick', e => {
   }
 });
 
-// ── Keyboard shortcuts ──────────────────────────────────────────────────────
-// Arrow keys  : move selected item (hold Shift for 1 px fine nudge)
-// R           : rotate +90°
-// Shift+R     : rotate −90°
-// [  /  ]     : rotate −15° / +15° (fine)
-// D           : duplicate selected item
-// Delete / Backspace : remove selected item
-// Escape      : deselect
-// ─────────────────────────────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
-  // Delete / Backspace — no selection required
   if (e.key === 'Delete' || e.key === 'Backspace') { deleteSelected(); return; }
 
-  // Escape — deselect
-  if (e.key === 'Escape') { state.selected = null; updatePropsPanel(); render(); return; }
+  if (e.key === 'Escape') { clearSelection(); updatePropsPanel(); render(); return; }
 
-  if (!state.selected) return;
+  const sel = selectionItems();
+  if (sel.length === 0) return;
 
-  // Arrow keys — move
+  // Arrow keys — move all
   const step = e.shiftKey ? 1 : 10;
-  if (e.key === 'ArrowLeft')  { state.selected.x -= step; e.preventDefault(); }
-  if (e.key === 'ArrowRight') { state.selected.x += step; e.preventDefault(); }
-  if (e.key === 'ArrowUp')    { state.selected.y -= step; e.preventDefault(); }
-  if (e.key === 'ArrowDown')  { state.selected.y += step; e.preventDefault(); }
+  if (e.key === 'ArrowLeft')  { sel.forEach(i => i.x -= step); e.preventDefault(); }
+  if (e.key === 'ArrowRight') { sel.forEach(i => i.x += step); e.preventDefault(); }
+  if (e.key === 'ArrowUp')    { sel.forEach(i => i.y -= step); e.preventDefault(); }
+  if (e.key === 'ArrowDown')  { sel.forEach(i => i.y += step); e.preventDefault(); }
 
   // R — rotate 90°  |  Shift+R — rotate −90°
   if (e.key === 'r' || e.key === 'R') {
     const delta = e.shiftKey ? -90 : 90;
-    state.selected.rot = ((state.selected.rot + delta) % 360 + 360) % 360;
+    sel.forEach(it => { it.rot = ((it.rot + delta) % 360 + 360) % 360; });
   }
 
-  // [ / ]  — fine rotate ±15°
+  // [ / ] — fine rotate ±15°
   if (e.key === '[' || e.key === ']') {
     const delta = e.key === '[' ? -15 : 15;
-    state.selected.rot = ((state.selected.rot + delta) % 360 + 360) % 360;
+    sel.forEach(it => { it.rot = ((it.rot + delta) % 360 + 360) % 360; });
     e.preventDefault();
   }
 
-  // D — duplicate
+  // D — duplicate all
   if (e.key === 'd' || e.key === 'D') {
-    const src = state.selected;
-    const copy = { ...src, id: state.nextId++, x: src.x + 20, y: src.y + 20, label: src.label };
-    state.items.push(copy);
-    state.selected = copy;
+    const copies = sel.map(src => ({ ...src, id: state.nextId++, x: src.x + 20, y: src.y + 20 }));
+    copies.forEach(c => state.items.push(c));
+    setSelection(copies);
+  }
+
+  // Ctrl/Cmd+A — select all
+  if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+    setSelection([...state.items]);
+    e.preventDefault();
   }
 
   updatePropsPanel();
@@ -1639,21 +1739,28 @@ document.addEventListener('keydown', e => {
 // ITEM TOOLBAR
 // ════════════════════════════════════════════
 function updateItemToolbar() {
-  const tb = document.getElementById('item-toolbar');
-  const item = state.selected;
-  if (!item || state.dragging) { tb.classList.add('hidden'); return; }
+  const tb  = document.getElementById('item-toolbar');
+  const sel = selectionItems();
+  const dragging = state.dragGroup || state.dragging;
 
-  // World centre of the item top edge
-  const cx = item.x + item.w / 2;
-  const cy = item.y;
+  if (sel.length === 0 || dragging) { tb.classList.add('hidden'); return; }
 
-  // Convert to canvas pixel coords
-  const sc = toCanvas(cx, cy);
+  // Position above the bounding-box top-centre of the selection
+  const minX = Math.min(...sel.map(i => i.x));
+  const maxX = Math.max(...sel.map(i => i.x + i.w));
+  const minY = Math.min(...sel.map(i => i.y));
+  const cx   = (minX + maxX) / 2;
+
+  const sc = toCanvas(cx, minY);
   const cr = canvas.getBoundingClientRect();
-
-  // Position toolbar above the item, anchored by its horizontal centre
   const px = cr.left + sc.x;
-  const py = cr.top  + sc.y - 10; // 10px gap above item
+  const py = cr.top  + sc.y - 10;
+
+  // For multi-select hide the W/H resize buttons (makes no sense for mixed items)
+  const multi = sel.length > 1;
+  tb.querySelectorAll('[data-single]').forEach(el => {
+    el.style.display = multi ? 'none' : '';
+  });
 
   tb.style.left = px + 'px';
   tb.style.top  = (py - tb.offsetHeight) + 'px';
@@ -1661,13 +1768,14 @@ function updateItemToolbar() {
 }
 
 function tbRotate(deg) {
-  if (!state.selected) return;
-  state.selected.rot = ((state.selected.rot + deg) % 360 + 360) % 360;
+  selectionItems().forEach(it => {
+    it.rot = ((it.rot + deg) % 360 + 360) % 360;
+  });
   updatePropsPanel(); render();
 }
 
 function tbResize(axis, delta) {
-  if (!state.selected) return;
+  if (!state.selected) return; // single-item only
   const MIN = 20, MAX = 600;
   if (axis === 'w') state.selected.w = Math.max(MIN, Math.min(MAX, state.selected.w + delta));
   if (axis === 'h') state.selected.h = Math.max(MIN, Math.min(MAX, state.selected.h + delta));
@@ -1675,11 +1783,11 @@ function tbResize(axis, delta) {
 }
 
 function tbDuplicate() {
-  if (!state.selected) return;
-  const src = state.selected;
-  const copy = { ...src, id: state.nextId++, x: src.x + 20, y: src.y + 20 };
-  state.items.push(copy);
-  state.selected = copy;
+  const copies = selectionItems().map(src => ({
+    ...src, id: state.nextId++, x: src.x + 20, y: src.y + 20,
+  }));
+  copies.forEach(c => state.items.push(c));
+  setSelection(copies);
   updatePropsPanel(); render();
 }
 
