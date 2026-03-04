@@ -504,6 +504,24 @@
             </svg>
             <span class="furniture-item-label">Bar</span>
           </div>
+          <div class="furniture-item" data-type="wall" title="Wall / Blocked Area">
+            <svg width="44" height="44" viewBox="0 0 44 44">
+              <defs>
+                <pattern id="wallHatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                  <line x1="0" y1="0" x2="0" y2="6" stroke="#7a6a5a" stroke-width="1.5"/>
+                </pattern>
+                <pattern id="wallHatch2" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">
+                  <line x1="0" y1="0" x2="0" y2="6" stroke="#7a6a5a" stroke-width="1.5"/>
+                </pattern>
+                <clipPath id="wallClip"><rect x="5" y="5" width="34" height="34"/></clipPath>
+              </defs>
+              <rect x="5" y="5" width="34" height="34" fill="rgba(90,80,70,0.12)"/>
+              <rect x="5" y="5" width="34" height="34" fill="url(#wallHatch)" clip-path="url(#wallClip)" opacity="0.5"/>
+              <rect x="5" y="5" width="34" height="34" fill="url(#wallHatch2)" clip-path="url(#wallClip)" opacity="0.5"/>
+              <rect x="5" y="5" width="34" height="34" fill="none" stroke="#3d3028" stroke-width="2"/>
+            </svg>
+            <span class="furniture-item-label">Wall</span>
+          </div>
         </div>
       </div>
 
@@ -656,6 +674,7 @@ const FURNITURE = {
   'sofa':         { label:'Sofa',         w:120, h:52,  seats:3,  color:'#d9d0c8' },
   'plant':        { label:'Plant',        w:50,  h:50,  seats:0,  color:'#4a7c45' },
   'bar':          { label:'Bar Counter',  w:160, h:50,  seats:0,  color:'#c8a87a' },
+  'wall':         { label:'Wall',          w:100, h:100, seats:0,  color:'#9a8e80' },
 };
 
 // ════════════════════════════════════════════
@@ -925,7 +944,11 @@ function drawItem(item, selected) {
     case 'sofa':         drawSofa(item); break;
     case 'plant':        drawPlant(item); break;
     case 'bar':          drawBar(item); break;
+    case 'wall':         drawWall(item); break;
   }
+
+  // Wall labels are handled inside drawWall — skip generic label for walls
+  if (item.type === 'wall') { ctx.restore(); return; }
 
   // Label
   if (item.label) {
@@ -1268,6 +1291,52 @@ function drawBar(item) {
     ctx.moveTo(gx, -hh+3);
     ctx.bezierCurveTo(gx+3, -hh+hh*0.2, gx-1, -hh+hh*0.4, gx+2, -hh+hh*0.65);
     ctx.stroke();
+  }
+}
+
+function drawWall(item) {
+  const hw = item.w/2, hh = item.h/2;
+  // Base fill
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(-hw, -hh, item.w, item.h);
+  ctx.clip();
+  ctx.fillStyle = 'rgba(80, 68, 55, 0.13)';
+  ctx.fillRect(-hw, -hh, item.w, item.h);
+  // Cross-hatch: two sets of diagonal lines at ±45°
+  ctx.strokeStyle = 'rgba(60, 48, 36, 0.35)';
+  ctx.lineWidth = 1.2;
+  const spacing = 14;
+  const diag = item.w + item.h;
+  // 45° lines (top-left to bottom-right)
+  for (let d = -diag; d <= diag; d += spacing) {
+    ctx.beginPath();
+    ctx.moveTo(-hw + d, -hh);
+    ctx.lineTo(-hw + d + item.h, hh);
+    ctx.stroke();
+  }
+  // -45° lines (top-right to bottom-left)
+  for (let d = -diag; d <= diag; d += spacing) {
+    ctx.beginPath();
+    ctx.moveTo(hw - d, -hh);
+    ctx.lineTo(hw - d - item.h, hh);
+    ctx.stroke();
+  }
+  ctx.restore();
+  // Border
+  ctx.strokeStyle = '#3d3028';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(-hw, -hh, item.w, item.h);
+  // "WALL" label centred
+  const fontSize = Math.max(8, Math.min(item.w * 0.14, 16));
+  if (fontSize * state.scale >= 7) {
+    ctx.save();
+    ctx.font = `600 ${fontSize}px "DM Mono", monospace`;
+    ctx.fillStyle = 'rgba(60,48,36,0.45)';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('WALL', 0, 0);
+    ctx.restore();
   }
 }
 
