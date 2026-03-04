@@ -1,0 +1,1916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Olive Tree Event Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Spectral:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink: #1a1410;
+    --ink-soft: #3d3028;
+    --ink-faint: #7a6a5a;
+    --paper: #f5f0e8;
+    --paper-warm: #ede7d9;
+    --paper-deep: #d9d0c0;
+    --rule: #c8bfad;
+    --rule-light: #e0d8c8;
+    --accent: #8b3a1a;
+    --accent-soft: #c4622d;
+    --accent-pale: #f0e0d4;
+    --blue-line: #b0c4d8;
+    --shadow: rgba(26,20,16,0.12);
+    --shadow-deep: rgba(26,20,16,0.22);
+  }
+
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: var(--paper);
+    font-family: 'DM Mono', monospace;
+    color: var(--ink);
+    user-select: none;
+  }
+
+  /* Subtle paper texture overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      repeating-linear-gradient(0deg, transparent, transparent 28px, var(--rule-light) 28px, var(--rule-light) 29px),
+      repeating-linear-gradient(90deg, transparent, transparent 28px, var(--rule-light) 28px, var(--rule-light) 29px);
+    opacity: 0.35;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── LAYOUT ── */
+  #app { display: flex; flex-direction: column; height: 100vh; position: relative; z-index: 1; }
+
+  /* ── HEADER ── */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px;
+    height: 56px;
+    background: var(--ink);
+    color: var(--paper);
+    flex-shrink: 0;
+    border-bottom: 3px solid var(--accent);
+  }
+  .brand {
+    font-family: 'DM Serif Display', serif;
+    font-size: 22px;
+    letter-spacing: 0.02em;
+    color: var(--paper);
+  }
+  .brand span { color: var(--accent-soft); font-style: italic; }
+  .header-actions { display: flex; gap: 10px; align-items: center; }
+  .btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1.5px solid currentColor;
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+    border-radius: 2px;
+  }
+  .btn-ghost { color: var(--paper-deep); }
+  .btn-ghost:hover { background: rgba(255,255,255,0.08); color: var(--paper); }
+  .btn-accent { color: var(--paper); background: var(--accent); border-color: var(--accent); }
+  .btn-accent:hover { background: var(--accent-soft); border-color: var(--accent-soft); }
+  .btn-ink { color: var(--ink); border-color: var(--rule); background: var(--paper); }
+  .btn-ink:hover { background: var(--paper-warm); border-color: var(--ink-faint); }
+  .room-name-wrap { display: flex; align-items: center; gap: 8px; color: var(--rule); font-size: 11px; letter-spacing: 0.1em; }
+  #roomNameInput {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: var(--paper);
+    font-family: 'DM Serif Display', serif;
+    font-size: 15px;
+    padding: 4px 10px;
+    border-radius: 2px;
+    outline: none;
+    width: 200px;
+  }
+  #roomNameInput:focus { border-color: var(--accent-soft); background: rgba(255,255,255,0.1); }
+
+  /* ── MAIN AREA ── */
+  #main { display: flex; flex: 1; overflow: hidden; }
+
+  /* ── SIDEBAR ── */
+  #sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--paper-warm);
+    border-right: 1.5px solid var(--rule);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .sidebar-section { padding: 16px; border-bottom: 1px solid var(--rule-light); }
+  .sidebar-label {
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 10px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .sidebar-label::after { content:''; flex:1; height:1px; background: var(--rule-light); }
+
+  /* Furniture items */
+  .furniture-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .furniture-item {
+    background: var(--paper);
+    border: 1.5px solid var(--rule);
+    border-radius: 3px;
+    padding: 10px 6px 8px;
+    cursor: grab;
+    -webkit-user-drag: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s;
+    position: relative;
+  }
+  .furniture-item:hover {
+    border-color: var(--accent-soft);
+    background: var(--accent-pale);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px var(--shadow);
+  }
+  .furniture-item:active { cursor: grabbing; transform: translateY(0); }
+  .furniture-item svg { display: block; }
+  .furniture-item-label {
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 500;
+  }
+
+  /* Properties panel */
+  .prop-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 8px; }
+  .prop-label { font-size: 10px; color: var(--ink-faint); letter-spacing: 0.06em; flex: 1; }
+  .prop-value {
+    font-size: 11px;
+    color: var(--ink);
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    padding: 3px 7px;
+    border-radius: 2px;
+    width: 72px;
+    text-align: right;
+    font-family: 'DM Mono', monospace;
+    outline: none;
+  }
+  .prop-value:focus { border-color: var(--accent-soft); }
+  .delete-btn {
+    width: 100%;
+    margin-top: 4px;
+    font-size: 10px;
+    color: var(--accent);
+    border-color: var(--accent);
+    padding: 5px 0;
+  }
+  .delete-btn:hover { background: var(--accent-pale); }
+  .no-selection {
+    font-size: 11px;
+    color: var(--ink-faint);
+    font-style: italic;
+    text-align: center;
+    padding: 8px 0;
+    font-family: 'Spectral', serif;
+  }
+
+  /* Room size controls */
+  .room-control { margin-bottom: 8px; }
+  .room-control label { font-size: 10px; color: var(--ink-faint); letter-spacing: 0.06em; display: block; margin-bottom: 3px; }
+  .room-control input[type=range] {
+    width: 100%; accent-color: var(--accent-soft);
+  }
+  .room-dims {
+    font-size: 10px;
+    color: var(--ink-soft);
+    text-align: center;
+    margin-top: 4px;
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* ── CANVAS AREA ── */
+  #canvasWrap {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    background: var(--paper-deep);
+  }
+  #canvasWrap canvas { display: block; }
+
+  /* Zoom controls */
+  #zoomControls {
+    position: absolute;
+    bottom: 16px; right: 16px;
+    display: flex; gap: 4px; flex-direction: column;
+    z-index: 10;
+  }
+  .zoom-btn {
+    width: 32px; height: 32px;
+    background: var(--paper);
+    border: 1.5px solid var(--rule);
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--ink-soft);
+    transition: all 0.12s;
+    font-family: monospace;
+  }
+  .zoom-btn:hover { background: var(--paper-warm); border-color: var(--ink-faint); }
+
+  /* Status bar */
+  #statusBar {
+    position: absolute;
+    bottom: 16px; left: 16px;
+    font-size: 10px;
+    color: var(--ink-faint);
+    letter-spacing: 0.06em;
+    background: rgba(245,240,232,0.85);
+    padding: 4px 10px;
+    border-radius: 2px;
+    border: 1px solid var(--rule-light);
+    pointer-events: none;
+  }
+
+  /* ── MODAL ── */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(26,20,16,0.55);
+    z-index: 100;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .modal-backdrop.open { opacity: 1; pointer-events: all; }
+  .modal {
+    background: var(--paper);
+    border: 2px solid var(--ink);
+    border-radius: 3px;
+    padding: 32px 36px;
+    max-width: 440px;
+    width: 90vw;
+    transform: translateY(8px);
+    transition: transform 0.2s;
+  }
+  .modal-backdrop.open .modal { transform: translateY(0); }
+  .modal h2 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 26px;
+    margin-bottom: 6px;
+    color: var(--ink);
+  }
+  .modal p {
+    font-size: 12px;
+    color: var(--ink-faint);
+    margin-bottom: 24px;
+    font-family: 'Spectral', serif;
+    font-style: italic;
+    line-height: 1.6;
+  }
+  .modal-field { margin-bottom: 16px; }
+  .modal-field label { display: block; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 5px; }
+  .modal-field input[type=text], .modal-field input[type=number] {
+    width: 100%;
+    background: var(--paper-warm);
+    border: 1.5px solid var(--rule);
+    padding: 9px 12px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--ink);
+    border-radius: 2px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .modal-field input:focus { border-color: var(--accent-soft); }
+  .modal-row { display: flex; gap: 12px; }
+  .modal-row .modal-field { flex: 1; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+
+  /* Color picker row */
+  .color-options { display: flex; gap: 8px; flex-wrap: wrap; }
+  .color-swatch {
+    width: 26px; height: 26px; border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.12s;
+    position: relative;
+  }
+  .color-swatch.active, .color-swatch:hover { border-color: var(--ink); transform: scale(1.15); }
+
+  /* Toast */
+  #toast {
+    position: fixed;
+    bottom: 24px; left: 50%; transform: translateX(-50%) translateY(12px);
+    background: var(--ink);
+    color: var(--paper);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    padding: 9px 20px;
+    border-radius: 2px;
+    border-left: 3px solid var(--accent);
+    opacity: 0;
+    transition: all 0.2s;
+    pointer-events: none;
+    z-index: 200;
+    white-space: nowrap;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ── Misc ── */
+  .sep { width: 1px; height: 20px; background: rgba(255,255,255,0.15); margin: 0 4px; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: var(--paper-warm); }
+  ::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 3px; }
+
+  /* ── FLOATING ITEM TOOLBAR ── */
+  #item-toolbar {
+    position: fixed;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background: var(--ink);
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 5px;
+    padding: 4px 6px;
+    box-shadow: 0 6px 24px rgba(26,20,16,0.45);
+    transform: translateX(-50%);
+    white-space: nowrap;
+    transition: opacity 0.12s;
+  }
+  #item-toolbar.hidden { display: none; }
+  /* little caret pointing down toward the item */
+  #item-toolbar::after {
+    content: '';
+    position: absolute;
+    top: 100%; left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: var(--ink);
+  }
+  .itb-btn {
+    width: 28px; height: 28px;
+    border-radius: 3px;
+    border: none;
+    background: transparent;
+    color: rgba(245,240,232,0.75);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-family: 'DM Mono', monospace;
+    transition: background 0.1s, color 0.1s;
+    padding: 0; flex-shrink: 0;
+  }
+  .itb-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  .itb-btn.danger:hover { background: rgba(220,60,60,0.25); color: #f99; }
+  .itb-btn svg { pointer-events: none; display: block; }
+  .itb-sep { width: 1px; height: 18px; background: rgba(255,255,255,0.12); margin: 0 3px; flex-shrink: 0; }
+  .itb-grp { display: flex; align-items: center; gap: 1px; }
+  .itb-label {
+    font-size: 8px; letter-spacing: 0.1em; color: rgba(245,240,232,0.35);
+    text-transform: uppercase; padding: 0 3px 0 5px; user-select: none;
+  }
+
+  /* ── SNAP TOGGLE ── */
+  #snap-toggle {
+    font-size: 9px;
+    letter-spacing: 0.09em;
+    padding: 5px 10px;
+    border-radius: 3px;
+    width: auto;
+  }
+  #snap-toggle.on {
+    background: var(--ink); color: var(--paper);
+    border-color: var(--ink-faint);
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand">Olive Tree <span>Event Planner</span></div>
+    <div class="room-name-wrap">
+      <span>PLAN —</span>
+      <input type="text" id="roomNameInput" value="Main Dining Hall" spellcheck="false">
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-ghost" onclick="clearAll()">Clear</button>
+      <button class="btn btn-ghost" onclick="openNewRoom()">New Room</button>
+      <div class="sep"></div>
+      <button class="btn btn-accent" onclick="exportPNG()">Export PNG</button>
+    </div>
+  </header>
+
+  <div id="main">
+    <div id="sidebar">
+      <!-- Furniture -->
+      <div class="sidebar-section">
+        <div class="sidebar-label">Furniture</div>
+        <div class="furniture-grid">
+          <div class="furniture-item" data-type="table-round" title="Round Table">
+            <svg width="44" height="44" viewBox="0 0 44 44">
+              <circle cx="22" cy="22" r="16" fill="#d9d0c0" stroke="#3d3028" stroke-width="1.5"/>
+              <circle cx="22" cy="22" r="10" fill="none" stroke="#7a6a5a" stroke-width="0.8" stroke-dasharray="2,2"/>
+              <circle cx="22" cy="22" r="2" fill="#7a6a5a"/>
+              <!-- grain lines -->
+              <path d="M12 18 Q22 15 32 18" fill="none" stroke="#c8bfad" stroke-width="0.7"/>
+              <path d="M10 22 Q22 19 34 22" fill="none" stroke="#c8bfad" stroke-width="0.7"/>
+              <path d="M12 26 Q22 29 32 26" fill="none" stroke="#c8bfad" stroke-width="0.7"/>
+            </svg>
+            <span class="furniture-item-label">Round</span>
+          </div>
+          <div class="furniture-item" data-type="table-rect" title="Rectangular Table">
+            <svg width="44" height="44" viewBox="0 0 44 44">
+              <rect x="6" y="12" width="32" height="20" rx="2" fill="#d9d0c0" stroke="#3d3028" stroke-width="1.5"/>
+              <rect x="10" y="16" width="24" height="12" rx="1" fill="none" stroke="#7a6a5a" stroke-width="0.8" stroke-dasharray="2,2"/>
+              <line x1="22" y1="12" x2="22" y2="32" stroke="#c8bfad" stroke-width="0.7"/>
+              <line x1="6" y1="22" x2="38" y2="22" stroke="#c8bfad" stroke-width="0.7"/>
+            </svg>
+            <span class="furniture-item-label">Rect</span>
+          </div>
+          <div class="furniture-item" data-type="table-long" title="Long Banquet Table">
+            <svg width="44" height="44" viewBox="0 0 44 44">
+              <rect x="3" y="15" width="38" height="14" rx="2" fill="#d9d0c0" stroke="#3d3028" stroke-width="1.5"/>
+              <rect x="6" y="18" width="32" height="8" rx="1" fill="none" stroke="#7a6a5a" stroke-width="0.8" stroke-dasharray="2,2"/>
+              <line x1="14" y1="15" x2="14" y2="29" stroke="#c8bfad" stroke-width="0.7"/>
+              <line x1="22" y1="15" x2="22" y2="29" stroke="#c8bfad" stroke-width="0.7"/>
+              <line x1="30" y1="15" x2="30" y2="29" stroke="#c8bfad" stroke-width="0.7"/>
+            </svg>
+            <span class="furniture-item-label">Banquet</span>
+          </div>
+          <div class="furniture-item" data-type="chair" title="Chair">
+            <svg width="44" height="44" viewBox="0 0 44 44">
+              <rect x="12" y="22" width="20" height="14" rx="3" fill="#e8e0d0" stroke="#3d3028" stroke-width="1.5"/>
+              <rect x="12" y="10" width="20" height="15" rx="3" fill="#d9d0c0" stroke="#3d3028" stroke-width="1.5"/>
+              <line x1="14" y1="36" x2="14" y2="40" stroke="#3d3028" stroke-width="1.5" stroke-linecap="round"/>
+              <line x1="30" y1="36" x2="30" y2="40" stroke="#3d3028" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <span class="furniture-item-label">Chair</span>
+          </div>
+          <div class="furniture-item" data-type="stool" title="Bar Stool">
+            <svg width="44" height="44" viewBox="0 0 44 44">
+              <ellipse cx="22" cy="14" rx="12" ry="6" fill="#d9d0c0" stroke="#3d3028" stroke-width="1.5"/>
+              <ellipse cx="22" cy="14" rx="7" ry="3" fill="none" stroke="#7a6a5a" stroke-width="0.8"/>
+              <line x1="22" y1="20" x2="22" y2="38" stroke="#3d3028" stroke-width="2" stroke-linecap="round"/>
+              <line x1="15" y1="35" x2="29" y2="35" stroke="#3d3028" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <span class="furniture-item-label">Stool</span>
+          </div>
+          <div class="furniture-item" data-type="sofa" title="Sofa / Bench">
+            <svg width="44" height="44" viewBox="0 0 44 44">
+              <rect x="4" y="20" width="36" height="16" rx="4" fill="#d9d0c0" stroke="#3d3028" stroke-width="1.5"/>
+              <rect x="8" y="14" width="28" height="10" rx="3" fill="#e0d8c8" stroke="#3d3028" stroke-width="1.5"/>
+              <rect x="4" y="20" width="7" height="16" rx="3" fill="#c8bfad" stroke="#3d3028" stroke-width="1.2"/>
+              <rect x="33" y="20" width="7" height="16" rx="3" fill="#c8bfad" stroke="#3d3028" stroke-width="1.2"/>
+              <line x1="22" y1="24" x2="22" y2="36" stroke="#bdb0a0" stroke-width="0.8"/>
+            </svg>
+            <span class="furniture-item-label">Sofa</span>
+          </div>
+          <div class="furniture-item" data-type="plant" title="Decorative Plant">
+            <svg width="44" height="44" viewBox="0 0 44 44">
+              <ellipse cx="22" cy="32" rx="8" ry="5" fill="#8b3a1a" stroke="#3d3028" stroke-width="1.2"/>
+              <circle cx="22" cy="20" r="10" fill="#4a7c45" stroke="#2d4f2a" stroke-width="1.2"/>
+              <circle cx="17" cy="16" r="6" fill="#5a9055" stroke="#2d4f2a" stroke-width="1"/>
+              <circle cx="27" cy="16" r="6" fill="#4a7c45" stroke="#2d4f2a" stroke-width="1"/>
+              <circle cx="22" cy="13" r="5" fill="#62a05c" stroke="#2d4f2a" stroke-width="1"/>
+            </svg>
+            <span class="furniture-item-label">Plant</span>
+          </div>
+          <div class="furniture-item" data-type="bar" title="Bar Counter">
+            <svg width="44" height="44" viewBox="0 0 44 44">
+              <rect x="4" y="14" width="36" height="20" rx="2" fill="#c8a87a" stroke="#3d3028" stroke-width="1.5"/>
+              <rect x="4" y="14" width="36" height="6" rx="2" fill="#b89060" stroke="#3d3028" stroke-width="1.2"/>
+              <rect x="8" y="26" width="6" height="8" rx="1" fill="#a87848" stroke="#3d3028" stroke-width="1"/>
+              <rect x="19" y="26" width="6" height="8" rx="1" fill="#a87848" stroke="#3d3028" stroke-width="1"/>
+              <rect x="30" y="26" width="6" height="8" rx="1" fill="#a87848" stroke="#3d3028" stroke-width="1"/>
+            </svg>
+            <span class="furniture-item-label">Bar</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Properties -->
+      <div class="sidebar-section" id="propsPanel">
+        <div class="sidebar-label">Properties</div>
+        <div id="propsContent">
+          <div class="no-selection">Select an item<br>to edit its properties</div>
+        </div>
+      </div>
+
+      <!-- Room -->
+      <div class="sidebar-section">
+        <div class="sidebar-label">Room Size</div>
+        <div class="room-control">
+          <label>Width — <span id="wVal">800</span>px</label>
+          <input type="range" id="roomW" min="400" max="1600" value="800" step="50" oninput="updateRoomSize()">
+        </div>
+        <div class="room-control">
+          <label>Height — <span id="hVal">600</span>px</label>
+          <input type="range" id="roomH" min="300" max="1200" value="600" step="50" oninput="updateRoomSize()">
+        </div>
+        <div class="room-dims" id="roomDimsDisplay">800 × 600</div>
+      </div>
+
+      <!-- Stats -->
+      <div class="sidebar-section">
+        <div class="sidebar-label">Summary</div>
+        <div id="statsContent" style="font-size:11px; line-height:1.9; color:var(--ink-soft);"></div>
+      </div>
+    </div>
+
+    <div id="canvasWrap">
+      <canvas id="canvas"></canvas>
+      <!-- Floating item action toolbar -->
+      <div id="item-toolbar" class="hidden">
+        <span class="itb-label">Rotate</span>
+        <div class="itb-grp">
+          <button class="itb-btn" onclick="tbRotate(-90)" title="Rotate 90° counter-clockwise">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 .49-4"/></svg>
+          </button>
+          <button class="itb-btn" onclick="tbRotate(90)" title="Rotate 90° clockwise">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-.49-4"/></svg>
+          </button>
+        </div>
+        <div class="itb-sep"></div>
+        <span class="itb-label">W</span>
+        <div class="itb-grp">
+          <button class="itb-btn" onclick="tbResize('w',-10)" title="Shrink width">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <button class="itb-btn" onclick="tbResize('w',10)" title="Expand width">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        </div>
+        <div class="itb-sep"></div>
+        <span class="itb-label">H</span>
+        <div class="itb-grp">
+          <button class="itb-btn" onclick="tbResize('h',-10)" title="Shrink height">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <button class="itb-btn" onclick="tbResize('h',10)" title="Expand height">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        </div>
+        <div class="itb-sep"></div>
+        <button class="itb-btn" onclick="tbDuplicate()" title="Duplicate (D)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+        <button class="itb-btn danger" onclick="deleteSelected()" title="Delete (Del)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+        </button>
+      </div>
+
+      <div id="zoomControls">
+        <button class="zoom-btn" onclick="zoom(1.15)" title="Zoom In">+</button>
+        <button class="zoom-btn" onclick="zoom(0.87)" title="Zoom Out">−</button>
+        <button class="zoom-btn" onclick="resetZoom()" title="Reset" style="font-size:10px;">⊙</button>
+        <button class="zoom-btn btn-ink" id="snap-toggle" onclick="toggleSnap()" title="Toggle grid snapping">SNAP</button>
+      </div>
+      <div id="statusBar">Drag from sidebar to place &nbsp;·&nbsp; Arrow keys move &nbsp;·&nbsp; R / Shift+R rotate ±90° &nbsp;·&nbsp; [ ] fine rotate ±15° &nbsp;·&nbsp; D duplicate &nbsp;·&nbsp; Del remove</div>
+    </div>
+  </div>
+</div>
+
+<!-- New Room Modal -->
+<div class="modal-backdrop" id="newRoomModal">
+  <div class="modal">
+    <h2>New Room</h2>
+    <p>Start fresh with a new seating plan. Any unsaved changes will be lost.</p>
+    <div class="modal-field">
+      <label>Room Name</label>
+      <input type="text" id="modalRoomName" value="Grand Ballroom">
+    </div>
+    <div class="modal-row">
+      <div class="modal-field">
+        <label>Width (px)</label>
+        <input type="number" id="modalW" value="800" min="400" max="1600" step="50">
+      </div>
+      <div class="modal-field">
+        <label>Height (px)</label>
+        <input type="number" id="modalH" value="600" min="300" max="1200" step="50">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ink" onclick="closeModal('newRoomModal')">Cancel</button>
+      <button class="btn btn-accent" onclick="createNewRoom()">Create Room</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════
+const canvas = document.getElementById('canvas');
+let ctx = canvas.getContext('2d');
+
+let state = {
+  items: [],
+  room: { w: 800, h: 600 },
+  selected: null,
+  nextId: 1,
+  pan: { x: 0, y: 0 },
+  scale: 1,
+  dragging: null,
+  dragOff: { x: 0, y: 0 },
+  panDragging: false,
+  panStart: { x: 0, y: 0 },
+  panOrigin: { x: 0, y: 0 },
+  dropType: null,
+  snapEnabled: true,
+  resizing: null,   // { handle, origCX, origCY, origHW, origHH, startLocal }
+};
+
+const FURNITURE = {
+  'table-round':  { label:'Round Table',  w:90,  h:90,  seats:6,  color:'#c8bfad' },
+  'table-rect':   { label:'Rect. Table',  w:120, h:70,  seats:8,  color:'#c8bfad' },
+  'table-long':   { label:'Banquet Table',w:200, h:60,  seats:12, color:'#c8bfad' },
+  'chair':        { label:'Chair',        w:40,  h:44,  seats:1,  color:'#e0d8c8' },
+  'stool':        { label:'Bar Stool',    w:36,  h:36,  seats:1,  color:'#e0d8c8' },
+  'sofa':         { label:'Sofa',         w:120, h:52,  seats:3,  color:'#d9d0c8' },
+  'plant':        { label:'Plant',        w:50,  h:50,  seats:0,  color:'#4a7c45' },
+  'bar':          { label:'Bar Counter',  w:160, h:50,  seats:0,  color:'#c8a87a' },
+};
+
+const CHAIR_COLORS = ['#e0d8c8','#c8d4e0','#d4e0c8','#e0c8c8','#e0d8b0','#c8c8d8'];
+const TABLE_COLORS = ['#c8bfad','#b8c4c0','#c4bcb0','#c0c8b8','#c8b8b0','#b0bcbc'];
+
+// ════════════════════════════════════════════
+// CANVAS SETUP & RESIZE
+// ════════════════════════════════════════════
+function resizeCanvas() {
+  const wrap = document.getElementById('canvasWrap');
+  canvas.width = wrap.clientWidth;
+  canvas.height = wrap.clientHeight;
+  centerRoom();
+  render();
+}
+
+function centerRoom() {
+  const wrap = document.getElementById('canvasWrap');
+  const ww = wrap.clientWidth  || canvas.width  || 800;
+  const wh = wrap.clientHeight || canvas.height || 600;
+  state.scale = Math.min(
+    (ww - 80) / state.room.w,
+    (wh - 80) / state.room.h,
+    1.2
+  );
+  state.pan.x = (ww - state.room.w * state.scale) / 2;
+  state.pan.y = (wh - state.room.h * state.scale) / 2;
+}
+
+window.addEventListener('resize', resizeCanvas);
+// Defer until after the browser has finished its first layout pass so
+// canvasWrap.clientWidth/Height are non-zero when we first read them.
+requestAnimationFrame(() => resizeCanvas());
+
+// ════════════════════════════════════════════
+// COORDINATE HELPERS
+// ════════════════════════════════════════════
+function toWorld(cx, cy) {
+  return {
+    x: (cx - state.pan.x) / state.scale,
+    y: (cy - state.pan.y) / state.scale
+  };
+}
+function toCanvas(wx, wy) {
+  return {
+    x: wx * state.scale + state.pan.x,
+    y: wy * state.scale + state.pan.y
+  };
+}
+function canvasPos(e) {
+  const r = canvas.getBoundingClientRect();
+  if (e.touches) return { x: e.touches[0].clientX - r.left, y: e.touches[0].clientY - r.top };
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+
+// ════════════════════════════════════════════
+// RENDER
+// ════════════════════════════════════════════
+function render() {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Background
+  ctx.fillStyle = '#b8b0a0';
+  ctx.fillRect(0, 0, W, H);
+
+  // Shadow of room
+  ctx.save();
+  ctx.shadowColor = 'rgba(26,20,16,0.3)';
+  ctx.shadowBlur = 24 * state.scale;
+  ctx.shadowOffsetX = 6 * state.scale;
+  ctx.shadowOffsetY = 6 * state.scale;
+  ctx.fillStyle = '#f5f0e8';
+  ctx.fillRect(state.pan.x, state.pan.y, state.room.w * state.scale, state.room.h * state.scale);
+  ctx.restore();
+
+  // Room floor
+  ctx.save();
+  ctx.translate(state.pan.x, state.pan.y);
+  ctx.scale(state.scale, state.scale);
+
+  // Floor texture - wood planks
+  drawFloor();
+
+  // Grid / measurement lines
+  drawGrid();
+
+  // Room border
+  ctx.strokeStyle = '#1a1410';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(0, 0, state.room.w, state.room.h);
+
+  // Corner marks
+  drawCorners();
+
+  // Items (back to front by y)
+  const sorted = [...state.items].sort((a,b) => a.y - b.y);
+  for (const item of sorted) {
+    drawItem(item, item === state.selected);
+  }
+
+  // Room label (watermark)
+  ctx.save();
+  ctx.font = 'italic 13px "Spectral", serif';
+  ctx.fillStyle = 'rgba(122,106,90,0.35)';
+  ctx.textAlign = 'right';
+  ctx.fillText(document.getElementById('roomNameInput').value.toUpperCase(), state.room.w - 14, state.room.h - 12);
+  ctx.restore();
+
+  ctx.restore();
+  updateStats();
+  updateItemToolbar();
+}
+
+function drawFloor() {
+  // Warm floor color
+  ctx.fillStyle = '#ede7d9';
+  ctx.fillRect(0, 0, state.room.w, state.room.h);
+
+  // Wood grain lines (horizontal planks)
+  ctx.save();
+  const plankH = 40;
+  for (let y = 0; y < state.room.h; y += plankH) {
+    // Alternating plank shades
+    ctx.fillStyle = y % (plankH * 2) === 0 ? 'rgba(180,160,130,0.07)' : 'rgba(200,180,150,0.05)';
+    ctx.fillRect(0, y, state.room.w, plankH);
+    // Plank border
+    ctx.strokeStyle = 'rgba(160,140,110,0.12)';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(0, y); ctx.lineTo(state.room.w, y);
+    ctx.stroke();
+    // Grain details (deterministic — no Math.random() to avoid flicker)
+    ctx.strokeStyle = 'rgba(160,140,110,0.06)';
+    ctx.lineWidth = 0.4;
+    for (let i = 0; i < 3; i++) {
+      // Quasirandom but stable: mix row index y and grain index i
+      const gx = ((y * 0.7 + i * 137.5) % 1000 / 1000) * state.room.w;
+      const dy1 = ((y * 1.3 + i * 73.1) % 10) - 3;
+      const dy2 = ((y * 0.9 + i * 51.7) % 10) - 2;
+      ctx.beginPath();
+      ctx.moveTo(gx, y + 5);
+      ctx.bezierCurveTo(gx + 40, y + 5 + dy1, gx + 80, y + 8 + dy2, gx + 120, y + 7);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawGrid() {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(150,135,115,0.18)';
+  ctx.lineWidth = 0.5;
+  const step = 50;
+  for (let x = step; x < state.room.w; x += step) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, state.room.h); ctx.stroke();
+  }
+  for (let y = step; y < state.room.h; y += step) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(state.room.w, y); ctx.stroke();
+  }
+  // Tick marks on border
+  ctx.strokeStyle = 'rgba(60,48,36,0.3)';
+  ctx.lineWidth = 1;
+  for (let x = step; x < state.room.w; x += step) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 5); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, state.room.h); ctx.lineTo(x, state.room.h - 5); ctx.stroke();
+  }
+  for (let y = step; y < state.room.h; y += step) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(5, y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(state.room.w, y); ctx.lineTo(state.room.w - 5, y); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawCorners() {
+  ctx.save();
+  ctx.strokeStyle = '#1a1410';
+  ctx.lineWidth = 2;
+  const s = 16;
+  const corners = [[0,0],[state.room.w,0],[0,state.room.h],[state.room.w,state.room.h]];
+  const dirs    = [[1,1],[-1,1],[1,-1],[-1,-1]];
+  for (let i = 0; i < corners.length; i++) {
+    const [cx,cy] = corners[i];
+    const [dx,dy] = dirs[i];
+    ctx.beginPath();
+    ctx.moveTo(cx + dx*s, cy);
+    ctx.lineTo(cx, cy);
+    ctx.lineTo(cx, cy + dy*s);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawItem(item, selected) {
+  ctx.save();
+  ctx.translate(item.x + item.w/2, item.y + item.h/2);
+  ctx.rotate(item.rot * Math.PI/180);
+
+  // Selection halo
+  if (selected) {
+    ctx.save();
+    ctx.strokeStyle = '#8b3a1a';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 3]);
+    const pad = 6;
+    if (item.type === 'table-round') {
+      ctx.beginPath();
+      ctx.arc(0, 0, item.w/2 + pad, 0, Math.PI*2);
+      ctx.stroke();
+    } else {
+      ctx.strokeRect(-item.w/2 - pad, -item.h/2 - pad, item.w + pad*2, item.h + pad*2);
+    }
+    ctx.setLineDash([]);
+    ctx.restore();
+    // Drag handles
+    drawHandles(item);
+  }
+
+  // Draw by type
+  switch (item.type) {
+    case 'table-round':  drawTableRound(item); break;
+    case 'table-rect':   drawTableRect(item); break;
+    case 'table-long':   drawTableLong(item); break;
+    case 'chair':        drawChair(item); break;
+    case 'stool':        drawStool(item); break;
+    case 'sofa':         drawSofa(item); break;
+    case 'plant':        drawPlant(item); break;
+    case 'bar':          drawBar(item); break;
+  }
+
+  // Label
+  if (item.label) {
+    ctx.font = '700 9px "DM Mono", monospace';
+    ctx.fillStyle = 'rgba(26,20,16,0.55)';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const maxW = item.type === 'table-round' ? item.w * 0.65 : item.w * 0.85;
+    let text = item.label;
+    if (ctx.measureText(text).width > maxW) text = text.substring(0, 8) + '…';
+    if (item.type !== 'chair' && item.type !== 'stool') {
+      ctx.fillText(text, 0, 0);
+    }
+  }
+
+  ctx.restore();
+}
+
+function drawHandles(item) {
+  // 8 resize handles drawn in item-local (rotated) space
+  const hp = getHandleLocalPositions(item); // { nw, n, ne, e, se, s, sw, w }
+  ctx.save();
+  Object.values(hp).forEach(([hx, hy]) => {
+    ctx.beginPath();
+    ctx.rect(hx - 5, hy - 5, 10, 10);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.strokeStyle = '#8b3a1a';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    // Inner dot
+    ctx.beginPath();
+    ctx.arc(hx, hy, 1.5, 0, Math.PI*2);
+    ctx.fillStyle = '#8b3a1a';
+    ctx.fill();
+  });
+  ctx.restore();
+}
+
+// ════════════════════════════════════════════
+// RESIZE HANDLE SYSTEM
+// ════════════════════════════════════════════
+
+// For each handle: local multipliers (lx,ly), resize scale factors (sx,sy), CSS cursor
+const HANDLE_DEFS = {
+  nw: { lx: -1, ly: -1, sx: -1, sy: -1, cursor: 'nwse-resize' },
+  n:  { lx:  0, ly: -1, sx:  0, sy: -1, cursor: 'ns-resize'   },
+  ne: { lx:  1, ly: -1, sx:  1, sy: -1, cursor: 'nesw-resize' },
+  e:  { lx:  1, ly:  0, sx:  1, sy:  0, cursor: 'ew-resize'   },
+  se: { lx:  1, ly:  1, sx:  1, sy:  1, cursor: 'nwse-resize' },
+  s:  { lx:  0, ly:  1, sx:  0, sy:  1, cursor: 'ns-resize'   },
+  sw: { lx: -1, ly:  1, sx: -1, sy:  1, cursor: 'nesw-resize' },
+  w:  { lx: -1, ly:  0, sx: -1, sy:  0, cursor: 'ew-resize'   },
+};
+const HPAD = 6; // pixels of padding beyond the item boundary
+
+// Returns local [x,y] position for each handle key
+function getHandleLocalPositions(item) {
+  const hw = item.w / 2 + HPAD;
+  const hh = item.type === 'table-round' ? item.w / 2 + HPAD : item.h / 2 + HPAD;
+  const result = {};
+  for (const [key, def] of Object.entries(HANDLE_DEFS)) {
+    result[key] = [def.lx * hw, def.ly * hh];
+  }
+  return result;
+}
+
+// Transform a world-space point into item-local space (centred at item centre)
+function worldToItemLocal(wx, wy, item) {
+  const cx = item.x + item.w / 2, cy = item.y + item.h / 2;
+  const θ  = -item.rot * Math.PI / 180;
+  const cos = Math.cos(θ), sin = Math.sin(θ);
+  const dx  = wx - cx, dy = wy - cy;
+  return { x: cos * dx - sin * dy, y: sin * dx + cos * dy };
+}
+
+// Returns { item, handleKey } if mouse (world space) is over a resize handle
+function getHandleAt(wx, wy) {
+  const item = state.selected;
+  if (!item) return null;
+  const HIT = 8 / state.scale; // hit radius in world px
+  const local = worldToItemLocal(wx, wy, item);
+  const hw = item.w / 2 + HPAD;
+  const hh = item.type === 'table-round' ? item.w / 2 + HPAD : item.h / 2 + HPAD;
+  for (const [key, def] of Object.entries(HANDLE_DEFS)) {
+    const hx = def.lx * hw, hy = def.ly * hh;
+    if (Math.abs(local.x - hx) <= HIT && Math.abs(local.y - hy) <= HIT) {
+      return { item, key };
+    }
+  }
+  return null;
+}
+
+function drawTableRound(item) {
+  const r = item.w / 2;
+  // Shadow
+  ctx.save();
+  ctx.shadowColor = 'rgba(26,20,16,0.2)';
+  ctx.shadowBlur = 8; ctx.shadowOffsetX = 3; ctx.shadowOffsetY = 3;
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI*2);
+  ctx.fillStyle = item.color || '#c8bfad'; ctx.fill();
+  ctx.restore();
+  // Border
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI*2);
+  ctx.strokeStyle = '#3d3028'; ctx.lineWidth = 1.5; ctx.stroke();
+  // Inner ring
+  ctx.beginPath(); ctx.arc(0, 0, r * 0.65, 0, Math.PI*2);
+  ctx.strokeStyle = 'rgba(61,48,40,0.3)'; ctx.lineWidth = 0.8; ctx.setLineDash([3,3]);
+  ctx.stroke(); ctx.setLineDash([]);
+  // Grain lines
+  ctx.strokeStyle = 'rgba(122,106,90,0.25)'; ctx.lineWidth = 0.6;
+  for (let i = -3; i <= 3; i++) {
+    const py = i * r * 0.28;
+    const hw = Math.sqrt(Math.max(0, r*r - py*py)) * 0.95;
+    ctx.beginPath(); ctx.moveTo(-hw, py); ctx.lineTo(hw, py); ctx.stroke();
+  }
+  // Center dot
+  ctx.beginPath(); ctx.arc(0, 0, 2.5, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(61,48,40,0.4)'; ctx.fill();
+}
+
+function drawTableRect(item) {
+  const hw = item.w/2, hh = item.h/2;
+  // Shadow
+  ctx.save();
+  ctx.shadowColor = 'rgba(26,20,16,0.2)';
+  ctx.shadowBlur = 8; ctx.shadowOffsetX = 3; ctx.shadowOffsetY = 3;
+  ctx.beginPath();
+  roundedRect(-hw, -hh, item.w, item.h, 3);
+  ctx.fillStyle = item.color || '#c8bfad'; ctx.fill();
+  ctx.restore();
+  // Border
+  ctx.beginPath(); roundedRect(-hw, -hh, item.w, item.h, 3);
+  ctx.strokeStyle = '#3d3028'; ctx.lineWidth = 1.5; ctx.stroke();
+  // Inner frame
+  ctx.beginPath(); roundedRect(-hw+5, -hh+5, item.w-10, item.h-10, 2);
+  ctx.strokeStyle = 'rgba(61,48,40,0.25)'; ctx.lineWidth = 0.8; ctx.setLineDash([3,3]);
+  ctx.stroke(); ctx.setLineDash([]);
+  // Grain
+  ctx.strokeStyle = 'rgba(122,106,90,0.2)'; ctx.lineWidth = 0.5;
+  for (let i = -3; i <= 3; i++) {
+    ctx.beginPath(); ctx.moveTo(-hw+4, i*9); ctx.lineTo(hw-4, i*9); ctx.stroke();
+  }
+}
+
+function drawTableLong(item) {
+  const hw = item.w/2, hh = item.h/2;
+  ctx.save();
+  ctx.shadowColor = 'rgba(26,20,16,0.2)';
+  ctx.shadowBlur = 8; ctx.shadowOffsetX = 3; ctx.shadowOffsetY = 3;
+  ctx.beginPath(); roundedRect(-hw, -hh, item.w, item.h, 3);
+  ctx.fillStyle = item.color || '#c8bfad'; ctx.fill();
+  ctx.restore();
+  ctx.beginPath(); roundedRect(-hw, -hh, item.w, item.h, 3);
+  ctx.strokeStyle = '#3d3028'; ctx.lineWidth = 1.5; ctx.stroke();
+  // dividers
+  const cols = Math.floor(item.w / 50);
+  ctx.strokeStyle = 'rgba(61,48,40,0.15)'; ctx.lineWidth = 0.6;
+  for (let i = 1; i < cols; i++) {
+    const x = -hw + (item.w / cols) * i;
+    ctx.beginPath(); ctx.moveTo(x, -hh+4); ctx.lineTo(x, hh-4); ctx.stroke();
+  }
+  ctx.beginPath(); roundedRect(-hw+5, -hh+5, item.w-10, item.h-10, 2);
+  ctx.strokeStyle = 'rgba(61,48,40,0.2)'; ctx.setLineDash([4,3]);
+  ctx.stroke(); ctx.setLineDash([]);
+}
+
+function drawChair(item) {
+  const hw = item.w/2, hh = item.h/2;
+  const col = item.color || '#e0d8c8';
+  // Legs
+  ctx.save();
+  ctx.strokeStyle = '#2d2218'; ctx.lineWidth = 1.8; ctx.lineCap = 'round';
+  [[-hw+4, hh-4],[hw-4, hh-4]].forEach(([lx, ly]) => {
+    ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx, ly+6); ctx.stroke();
+  });
+  ctx.restore();
+  // Seat
+  ctx.save();
+  ctx.shadowColor = 'rgba(26,20,16,0.15)'; ctx.shadowBlur = 5; ctx.shadowOffsetY = 2;
+  ctx.beginPath(); roundedRect(-hw, 0, item.w, hh, 3);
+  ctx.fillStyle = col; ctx.fill();
+  ctx.restore();
+  ctx.beginPath(); roundedRect(-hw, 0, item.w, hh, 3);
+  ctx.strokeStyle = '#3d3028'; ctx.lineWidth = 1.2; ctx.stroke();
+  // Backrest
+  ctx.save();
+  ctx.shadowColor = 'rgba(26,20,16,0.12)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 1;
+  const darker = shadeColor(col, -15);
+  ctx.beginPath(); roundedRect(-hw, -hh, item.w, hh*0.85, 3);
+  ctx.fillStyle = darker; ctx.fill();
+  ctx.restore();
+  ctx.beginPath(); roundedRect(-hw, -hh, item.w, hh*0.85, 3);
+  ctx.strokeStyle = '#3d3028'; ctx.lineWidth = 1.2; ctx.stroke();
+  // Cushion detail
+  ctx.strokeStyle = 'rgba(61,48,40,0.15)'; ctx.lineWidth = 0.6;
+  ctx.beginPath(); roundedRect(-hw+3, -hh+3, item.w-6, hh*0.75, 2);
+  ctx.stroke();
+}
+
+function drawStool(item) {
+  const hw = item.w/2;
+  const col = item.color || '#e0d8c8';
+  // Stem
+  ctx.save();
+  ctx.strokeStyle = '#3d3028'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, item.h/2 + 4);
+  ctx.stroke();
+  // Footrest
+  ctx.lineWidth = 1.8;
+  ctx.beginPath(); ctx.moveTo(-hw*0.6, item.h*0.3); ctx.lineTo(hw*0.6, item.h*0.3);
+  ctx.stroke();
+  ctx.restore();
+  // Top
+  ctx.save();
+  ctx.shadowColor = 'rgba(26,20,16,0.15)'; ctx.shadowBlur = 5; ctx.shadowOffsetY = 2;
+  ctx.beginPath();
+  ctx.ellipse(0, -item.h/2 + hw*0.7, hw, hw*0.45, 0, 0, Math.PI*2);
+  ctx.fillStyle = col; ctx.fill();
+  ctx.restore();
+  ctx.beginPath();
+  ctx.ellipse(0, -item.h/2 + hw*0.7, hw, hw*0.45, 0, 0, Math.PI*2);
+  ctx.strokeStyle = '#3d3028'; ctx.lineWidth = 1.2; ctx.stroke();
+  // Top inner ring
+  ctx.beginPath();
+  ctx.ellipse(0, -item.h/2 + hw*0.7, hw*0.55, hw*0.25, 0, 0, Math.PI*2);
+  ctx.strokeStyle = 'rgba(61,48,40,0.2)'; ctx.lineWidth = 0.8; ctx.stroke();
+}
+
+function drawSofa(item) {
+  const hw = item.w/2, hh = item.h/2;
+  const col = item.color || '#d9d0c8';
+  ctx.save();
+  ctx.shadowColor = 'rgba(26,20,16,0.18)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 3;
+  // Body
+  ctx.beginPath(); roundedRect(-hw, -hh*0.4, item.w, item.h*0.9, 5);
+  ctx.fillStyle = col; ctx.fill();
+  // Backrest
+  ctx.beginPath(); roundedRect(-hw, -hh, item.w, item.h*0.65, 4);
+  ctx.fillStyle = shadeColor(col, -10); ctx.fill();
+  // Arms
+  ctx.beginPath(); roundedRect(-hw, -hh*0.2, item.w*0.14, item.h*0.7, 4);
+  ctx.fillStyle = shadeColor(col, -20); ctx.fill();
+  ctx.beginPath(); roundedRect(hw*0.72, -hh*0.2, item.w*0.14, item.h*0.7, 4);
+  ctx.fillStyle = shadeColor(col, -20); ctx.fill();
+  ctx.restore();
+  // Outlines
+  ctx.strokeStyle = '#3d3028'; ctx.lineWidth = 1.3;
+  ctx.beginPath(); roundedRect(-hw, -hh*0.4, item.w, item.h*0.9, 5); ctx.stroke();
+  ctx.beginPath(); roundedRect(-hw, -hh, item.w, item.h*0.65, 4); ctx.stroke();
+  ctx.beginPath(); roundedRect(-hw, -hh*0.2, item.w*0.14, item.h*0.7, 4); ctx.stroke();
+  ctx.beginPath(); roundedRect(hw*0.72, -hh*0.2, item.w*0.14, item.h*0.7, 4); ctx.stroke();
+  // Cushion lines
+  ctx.strokeStyle = 'rgba(61,48,40,0.2)'; ctx.lineWidth = 0.8;
+  const segments = Math.max(2, Math.floor(item.w / 60));
+  for (let i = 1; i < segments; i++) {
+    const sx = -hw + item.w/segments * i;
+    ctx.beginPath(); ctx.moveTo(sx, -hh*0.35); ctx.lineTo(sx, hh*0.45); ctx.stroke();
+  }
+}
+
+function drawPlant(item) {
+  const r = Math.min(item.w, item.h) / 2;
+  // Pot
+  ctx.save();
+  ctx.shadowColor = 'rgba(26,20,16,0.2)'; ctx.shadowBlur = 5; ctx.shadowOffsetY = 2;
+  ctx.beginPath();
+  ctx.moveTo(-r*0.5, r*0.25);
+  ctx.lineTo(-r*0.4, r);
+  ctx.lineTo(r*0.4, r);
+  ctx.lineTo(r*0.5, r*0.25);
+  ctx.closePath();
+  ctx.fillStyle = item.color || '#8b3a1a'; ctx.fill();
+  ctx.restore();
+  ctx.strokeStyle = '#3d3028'; ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(-r*0.5, r*0.25);
+  ctx.lineTo(-r*0.4, r);
+  ctx.lineTo(r*0.4, r);
+  ctx.lineTo(r*0.5, r*0.25);
+  ctx.closePath(); ctx.stroke();
+  // Leaves
+  const leafColors = ['#4a7c45','#5a9055','#3a6838','#62a05c'];
+  const leafPos = [[0,-r*0.9],[r*0.4,-r*0.55],[-r*0.4,-r*0.55],[r*0.2,-r*0.25],[-r*0.2,-r*0.2]];
+  const leafR = [r*0.5,r*0.38,r*0.38,r*0.32,r*0.32];
+  ctx.save();
+  ctx.shadowColor = 'rgba(26,20,16,0.15)'; ctx.shadowBlur = 4;
+  leafPos.forEach(([lx,ly], i) => {
+    ctx.beginPath(); ctx.arc(lx, ly, leafR[i], 0, Math.PI*2);
+    ctx.fillStyle = leafColors[i % leafColors.length]; ctx.fill();
+    ctx.strokeStyle = '#2d4f2a'; ctx.lineWidth = 0.8; ctx.stroke();
+  });
+  ctx.restore();
+}
+
+function drawBar(item) {
+  const hw = item.w/2, hh = item.h/2;
+  const col = item.color || '#c8a87a';
+  ctx.save();
+  ctx.shadowColor = 'rgba(26,20,16,0.2)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 3;
+  ctx.beginPath(); roundedRect(-hw, -hh, item.w, item.h, 3);
+  ctx.fillStyle = col; ctx.fill();
+  ctx.restore();
+  // Counter top
+  ctx.beginPath(); roundedRect(-hw, -hh, item.w, hh*0.7, 3);
+  ctx.fillStyle = shadeColor(col, -15); ctx.fill();
+  ctx.strokeStyle = '#3d3028'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); roundedRect(-hw, -hh, item.w, item.h, 3); ctx.stroke();
+  ctx.beginPath(); roundedRect(-hw, -hh, item.w, hh*0.7, 2); ctx.stroke();
+  // Cabinet panels
+  const panels = Math.max(2, Math.floor(item.w / 55));
+  ctx.strokeStyle = 'rgba(61,48,40,0.3)'; ctx.lineWidth = 1;
+  for (let i = 0; i < panels; i++) {
+    const px = -hw + 5 + (item.w-10)/panels * i;
+    const pw = (item.w-10)/panels - 4;
+    ctx.beginPath(); roundedRect(px, -hh*0.1, pw, hh*1.0, 2); ctx.stroke();
+    // Handle
+    ctx.beginPath();
+    ctx.arc(px + pw/2, -hh*0.1 + hh*0.55, 3, 0, Math.PI*2);
+    ctx.fillStyle = shadeColor(col, -30); ctx.fill();
+  }
+  // Wood grain on top
+  ctx.strokeStyle = 'rgba(180,140,90,0.3)'; ctx.lineWidth = 0.5;
+  for (let gx = -hw+10; gx < hw-10; gx += 12) {
+    ctx.beginPath();
+    ctx.moveTo(gx, -hh+3);
+    ctx.bezierCurveTo(gx+3, -hh+hh*0.2, gx-1, -hh+hh*0.4, gx+2, -hh+hh*0.65);
+    ctx.stroke();
+  }
+}
+
+function roundedRect(x, y, w, h, r) {
+  ctx.moveTo(x+r, y);
+  ctx.lineTo(x+w-r, y);
+  ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+  ctx.lineTo(x+w, y+h-r);
+  ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  ctx.lineTo(x+r, y+h);
+  ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+  ctx.lineTo(x, y+r);
+  ctx.quadraticCurveTo(x, y, x+r, y);
+  ctx.closePath();
+}
+
+function shadeColor(hex, pct) {
+  const num = parseInt(hex.replace('#',''), 16);
+  const r = Math.min(255, Math.max(0, (num >> 16) + pct));
+  const g = Math.min(255, Math.max(0, ((num >> 8) & 0xff) + pct));
+  const b = Math.min(255, Math.max(0, (num & 0xff) + pct));
+  return '#' + [r,g,b].map(v=>v.toString(16).padStart(2,'0')).join('');
+}
+
+// ════════════════════════════════════════════
+// ITEM MANAGEMENT
+// ════════════════════════════════════════════
+function createItem(type, x, y) {
+  const def = FURNITURE[type];
+  return {
+    id: state.nextId++,
+    type, x, y,
+    w: def.w, h: def.h,
+    rot: 0,
+    label: '',
+    color: def.color,
+  };
+}
+
+function hitTest(item, wx, wy) {
+  const cx = item.x + item.w/2, cy = item.y + item.h/2;
+  const rad = item.rot * Math.PI/180;
+  const cos = Math.cos(-rad), sin = Math.sin(-rad);
+  const dx = wx - cx, dy = wy - cy;
+  const lx = cos*dx - sin*dy, ly = sin*dx + cos*dy;
+  if (item.type === 'table-round') {
+    return Math.sqrt(lx*lx + ly*ly) <= item.w/2 + 4;
+  }
+  return lx >= -item.w/2-4 && lx <= item.w/2+4 && ly >= -item.h/2-4 && ly <= item.h/2+4;
+}
+
+function getItemAt(wx, wy) {
+  for (let i = state.items.length - 1; i >= 0; i--) {
+    if (hitTest(state.items[i], wx, wy)) return state.items[i];
+  }
+  return null;
+}
+
+function deleteSelected() {
+  if (!state.selected) return;
+  state.items = state.items.filter(i => i !== state.selected);
+  state.selected = null;
+  updatePropsPanel();
+  render();
+}
+
+// ════════════════════════════════════════════
+// PROPERTIES PANEL
+// ════════════════════════════════════════════
+function updatePropsPanel() {
+  const el = document.getElementById('propsContent');
+  const item = state.selected;
+  if (!item) {
+    el.innerHTML = '<div class="no-selection">Select an item<br>to edit its properties</div>';
+    return;
+  }
+  const def = FURNITURE[item.type];
+  const colorPalette = item.type.startsWith('table') ? TABLE_COLORS : CHAIR_COLORS;
+  el.innerHTML = `
+    <div class="prop-row">
+      <span class="prop-label">Type</span>
+      <span style="font-size:10px;color:var(--ink-soft)">${def.label}</span>
+    </div>
+    <div class="prop-row">
+      <span class="prop-label">Label</span>
+      <input class="prop-value" type="text" value="${item.label||''}" oninput="setProp('label',this.value)" style="width:90px;text-align:left" maxlength="12">
+    </div>
+    <div class="prop-row">
+      <span class="prop-label">Width</span>
+      <input class="prop-value" type="number" value="${item.w}" oninput="setProp('w',+this.value)" min="20" max="400">
+    </div>
+    <div class="prop-row">
+      <span class="prop-label">Height</span>
+      <input class="prop-value" type="number" value="${item.h}" oninput="setProp('h',+this.value)" min="20" max="400">
+    </div>
+    <div class="prop-row">
+      <span class="prop-label">Rotate °</span>
+      <input class="prop-value" type="number" value="${item.rot}" oninput="setProp('rot',+this.value)" min="-180" max="360">
+    </div>
+    <div class="prop-row" style="align-items:flex-start;flex-direction:column;gap:6px">
+      <span class="prop-label">Colour</span>
+      <div class="color-options">${colorPalette.map(c=>`<div class="color-swatch${item.color===c?' active':''}" style="background:${c}" onclick="setProp('color','${c}')"></div>`).join('')}</div>
+    </div>
+    <button class="btn delete-btn" onclick="deleteSelected()">✕ Remove</button>
+  `;
+}
+
+function setProp(key, val) {
+  if (!state.selected) return;
+  state.selected[key] = val;
+  render();
+  if (key === 'color') updatePropsPanel();
+}
+
+// ════════════════════════════════════════════
+// STATS
+// ════════════════════════════════════════════
+function updateStats() {
+  const counts = {};
+  let totalSeats = 0;
+  for (const item of state.items) {
+    counts[item.type] = (counts[item.type] || 0) + 1;
+    totalSeats += FURNITURE[item.type].seats || 0;
+  }
+  const el = document.getElementById('statsContent');
+  if (state.items.length === 0) {
+    el.textContent = 'No items placed yet.';
+    return;
+  }
+  const lines = [];
+  for (const [t, n] of Object.entries(counts)) {
+    lines.push(`${FURNITURE[t].label}: ${n}`);
+  }
+  lines.push('—');
+  lines.push(`Total seats: ${totalSeats}`);
+  lines.push(`Total items: ${state.items.length}`);
+  el.innerHTML = lines.map(l => `<div>${l}</div>`).join('');
+}
+
+// ════════════════════════════════════════════
+// DRAG FROM SIDEBAR (pointer-event based, no HTML5 DnD)
+// ════════════════════════════════════════════
+let sidebarDrag = null; // { type, ghost, offsetX, offsetY }
+
+function createGhost(type) {
+  const ghost = document.createElement('div');
+  ghost.style.cssText = `
+    position:fixed; pointer-events:none; z-index:9999;
+    background:rgba(245,240,232,0.92); border:2px dashed #8b3a1a;
+    border-radius:4px; padding:6px 10px;
+    font-family:'DM Mono',monospace; font-size:11px; letter-spacing:0.08em;
+    color:#3d3028; white-space:nowrap;
+    box-shadow:0 4px 16px rgba(26,20,16,0.25);
+    transform:translate(-50%,-50%);
+  `;
+  ghost.textContent = '+ ' + FURNITURE[type].label;
+  document.body.appendChild(ghost);
+  return ghost;
+}
+
+document.querySelectorAll('.furniture-item').forEach(el => {
+  el.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    // Capture the pointer so we receive all move/up events even outside the element
+    el.setPointerCapture(e.pointerId);
+    const type = el.dataset.type;
+    const ghost = createGhost(type);
+    ghost.style.left = e.clientX + 'px';
+    ghost.style.top  = e.clientY + 'px';
+    sidebarDrag = { type, ghost };
+
+    function onMove(ev) {
+      ghost.style.left = ev.clientX + 'px';
+      ghost.style.top  = ev.clientY + 'px';
+      // Highlight canvas when hovering over it
+      const cr = canvas.getBoundingClientRect();
+      const over = ev.clientX >= cr.left && ev.clientX <= cr.right &&
+                   ev.clientY >= cr.top  && ev.clientY <= cr.bottom;
+      ghost.style.borderColor = over ? '#c4622d' : '#8b3a1a';
+      ghost.style.background  = over ? 'rgba(240,224,212,0.96)' : 'rgba(245,240,232,0.92)';
+    }
+
+    function onUp(ev) {
+      el.removeEventListener('pointermove', onMove);
+      el.removeEventListener('pointerup',   onUp);
+      el.removeEventListener('pointercancel', onUp);
+      ghost.remove();
+      if (!sidebarDrag) return;
+      const { type } = sidebarDrag;
+      sidebarDrag = null;
+
+      // Use elementFromPoint so we detect the canvas even under the ghost
+      const target = document.elementFromPoint(ev.clientX, ev.clientY);
+      const overCanvas = target === canvas || canvas.contains(target);
+      if (overCanvas) {
+        const cr = canvas.getBoundingClientRect();
+        const pos = { x: ev.clientX - cr.left, y: ev.clientY - cr.top };
+        const w = toWorld(pos.x, pos.y);
+        const def = FURNITURE[type];
+        const item = createItem(type, w.x - def.w/2, w.y - def.h/2);
+        state.items.push(item);
+        state.selected = item;
+        updatePropsPanel();
+        render();
+        showToast(def.label + ' placed');
+      }
+    }
+
+    el.addEventListener('pointermove',   onMove);
+    el.addEventListener('pointerup',     onUp);
+    el.addEventListener('pointercancel', onUp);
+  });
+});
+
+// ════════════════════════════════════════════
+// MOUSE INTERACTION ON CANVAS
+// ════════════════════════════════════════════
+canvas.addEventListener('mousedown', e => {
+  if (e.button === 1 || (e.button === 0 && e.altKey)) {
+    // Pan
+    state.panDragging = true;
+    state.panStart = { x: e.clientX, y: e.clientY };
+    state.panOrigin = { ...state.pan };
+    canvas.style.cursor = 'grabbing';
+    return;
+  }
+  const pos = canvasPos(e);
+  const w   = toWorld(pos.x, pos.y);
+
+  // Check resize handles on selected item first
+  const handleHit = getHandleAt(w.x, w.y);
+  if (handleHit) {
+    const it = handleHit.item;
+    state.resizing = {
+      handle:    handleHit.key,
+      origCX:    it.x + it.w / 2,
+      origCY:    it.y + it.h / 2,
+      origHW:    it.w / 2,
+      origHH:    it.h / 2,
+      startLocal: worldToItemLocal(w.x, w.y, it),
+    };
+    canvas.style.cursor = HANDLE_DEFS[handleHit.key].cursor;
+    return;
+  }
+
+  const hit = getItemAt(w.x, w.y);
+  if (hit) {
+    state.selected = hit;
+    state.dragging = hit;
+    state.dragOff = { x: w.x - hit.x, y: w.y - hit.y };
+    canvas.style.cursor = 'grabbing';
+    updatePropsPanel();
+    render();
+  } else {
+    state.selected = null;
+    state.resizing = null;
+    updatePropsPanel();
+    render();
+  }
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (state.panDragging) {
+    state.pan.x = state.panOrigin.x + (e.clientX - state.panStart.x);
+    state.pan.y = state.panOrigin.y + (e.clientY - state.panStart.y);
+    render();
+    return;
+  }
+
+  // ── Resize ──────────────────────────────────────────
+  if (state.resizing) {
+    const pos = canvasPos(e);
+    const w   = toWorld(pos.x, pos.y);
+    const r   = state.resizing;
+    const item = state.selected;
+    const def  = HANDLE_DEFS[r.handle];
+
+    // Compute delta in item-local space (centre stays at origCX/CY)
+    const currentLocal = worldToItemLocal(w.x, w.y, item);
+    const dx = currentLocal.x - r.startLocal.x;
+    const dy = currentLocal.y - r.startLocal.y;
+
+    const MIN = 20;
+    let newHW = r.origHW, newHH = r.origHH;
+
+    if (item.type === 'table-round') {
+      // Round tables: keep square; use diagonal projection
+      const diag = def.sx * dx + def.sy * dy;
+      const steps = (Math.abs(def.sx) + Math.abs(def.sy)) || 1;
+      newHW = newHH = Math.max(MIN, r.origHW + diag / steps);
+    } else {
+      if (def.sx !== 0) newHW = Math.max(MIN, r.origHW + def.sx * dx);
+      if (def.sy !== 0) newHH = Math.max(MIN, r.origHH + def.sy * dy);
+    }
+
+    item.w = newHW * 2;
+    item.h = newHH * 2;
+    // Keep the visual centre fixed
+    item.x = r.origCX - newHW;
+    item.y = r.origCY - newHH;
+
+    canvas.style.cursor = def.cursor;
+    updatePropsPanel();
+    render();
+    return;
+  }
+
+  // ── Drag (move) ──────────────────────────────────────
+  if (state.dragging) {
+    const pos = canvasPos(e);
+    const w = toWorld(pos.x, pos.y);
+    let nx = w.x - state.dragOff.x;
+    let ny = w.y - state.dragOff.y;
+    // Snap to grid — toggle with snap button; shift key temporarily inverts
+    const doSnap = state.snapEnabled !== e.shiftKey;
+    if (doSnap) {
+      const snap = 10;
+      nx = Math.round(nx / snap) * snap;
+      ny = Math.round(ny / snap) * snap;
+    }
+    state.dragging.x = nx;
+    state.dragging.y = ny;
+    render();
+    updatePropsPanel();
+    return;
+  }
+
+  // ── Cursor feedback ───────────────────────────────────
+  const pos = canvasPos(e);
+  const w = toWorld(pos.x, pos.y);
+  const hh = getHandleAt(w.x, w.y);
+  if (hh) {
+    canvas.style.cursor = HANDLE_DEFS[hh.key].cursor;
+  } else {
+    canvas.style.cursor = getItemAt(w.x, w.y) ? 'grab' : 'default';
+  }
+});
+
+canvas.addEventListener('mouseup', () => {
+  state.dragging = null;
+  state.panDragging = false;
+  state.resizing = null;
+  canvas.style.cursor = 'default';
+  updateItemToolbar();
+});
+canvas.addEventListener('mouseleave', () => {
+  state.dragging = null;
+  state.panDragging = false;
+  state.resizing = null;
+});
+
+// Scroll to zoom
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const pos = canvasPos(e);
+  const factor = e.deltaY < 0 ? 1.1 : 0.91;
+  const wx = (pos.x - state.pan.x) / state.scale;
+  const wy = (pos.y - state.pan.y) / state.scale;
+  state.scale = Math.min(3, Math.max(0.2, state.scale * factor));
+  state.pan.x = pos.x - wx * state.scale;
+  state.pan.y = pos.y - wy * state.scale;
+  render();
+}, { passive: false });
+
+// Double click to fine-rotate (+15°)
+canvas.addEventListener('dblclick', e => {
+  const pos = canvasPos(e);
+  const w = toWorld(pos.x, pos.y);
+  const hit = getItemAt(w.x, w.y);
+  if (hit) {
+    hit.rot = ((hit.rot + 15) % 360 + 360) % 360;
+    updatePropsPanel();
+    render();
+  }
+});
+
+// ── Keyboard shortcuts ──────────────────────────────────────────────────────
+// Arrow keys  : move selected item (hold Shift for 1 px fine nudge)
+// R           : rotate +90°
+// Shift+R     : rotate −90°
+// [  /  ]     : rotate −15° / +15° (fine)
+// D           : duplicate selected item
+// Delete / Backspace : remove selected item
+// Escape      : deselect
+// ─────────────────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+  // Delete / Backspace — no selection required
+  if (e.key === 'Delete' || e.key === 'Backspace') { deleteSelected(); return; }
+
+  // Escape — deselect
+  if (e.key === 'Escape') { state.selected = null; updatePropsPanel(); render(); return; }
+
+  if (!state.selected) return;
+
+  // Arrow keys — move
+  const step = e.shiftKey ? 1 : 10;
+  if (e.key === 'ArrowLeft')  { state.selected.x -= step; e.preventDefault(); }
+  if (e.key === 'ArrowRight') { state.selected.x += step; e.preventDefault(); }
+  if (e.key === 'ArrowUp')    { state.selected.y -= step; e.preventDefault(); }
+  if (e.key === 'ArrowDown')  { state.selected.y += step; e.preventDefault(); }
+
+  // R — rotate 90°  |  Shift+R — rotate −90°
+  if (e.key === 'r' || e.key === 'R') {
+    const delta = e.shiftKey ? -90 : 90;
+    state.selected.rot = ((state.selected.rot + delta) % 360 + 360) % 360;
+  }
+
+  // [ / ]  — fine rotate ±15°
+  if (e.key === '[' || e.key === ']') {
+    const delta = e.key === '[' ? -15 : 15;
+    state.selected.rot = ((state.selected.rot + delta) % 360 + 360) % 360;
+    e.preventDefault();
+  }
+
+  // D — duplicate
+  if (e.key === 'd' || e.key === 'D') {
+    const src = state.selected;
+    const copy = { ...src, id: state.nextId++, x: src.x + 20, y: src.y + 20, label: src.label };
+    state.items.push(copy);
+    state.selected = copy;
+  }
+
+  updatePropsPanel();
+  render();
+});
+
+// ════════════════════════════════════════════
+// ITEM TOOLBAR
+// ════════════════════════════════════════════
+function updateItemToolbar() {
+  const tb = document.getElementById('item-toolbar');
+  const item = state.selected;
+  if (!item || state.dragging) { tb.classList.add('hidden'); return; }
+
+  // World centre of the item top edge
+  const cx = item.x + item.w / 2;
+  const cy = item.y;
+
+  // Convert to canvas pixel coords
+  const sc = toCanvas(cx, cy);
+  const cr = canvas.getBoundingClientRect();
+
+  // Position toolbar above the item, anchored by its horizontal centre
+  const px = cr.left + sc.x;
+  const py = cr.top  + sc.y - 10; // 10px gap above item
+
+  tb.style.left = px + 'px';
+  tb.style.top  = (py - tb.offsetHeight) + 'px';
+  tb.classList.remove('hidden');
+}
+
+function tbRotate(deg) {
+  if (!state.selected) return;
+  state.selected.rot = ((state.selected.rot + deg) % 360 + 360) % 360;
+  updatePropsPanel(); render();
+}
+
+function tbResize(axis, delta) {
+  if (!state.selected) return;
+  const MIN = 20, MAX = 600;
+  if (axis === 'w') state.selected.w = Math.max(MIN, Math.min(MAX, state.selected.w + delta));
+  if (axis === 'h') state.selected.h = Math.max(MIN, Math.min(MAX, state.selected.h + delta));
+  updatePropsPanel(); render();
+}
+
+function tbDuplicate() {
+  if (!state.selected) return;
+  const src = state.selected;
+  const copy = { ...src, id: state.nextId++, x: src.x + 20, y: src.y + 20 };
+  state.items.push(copy);
+  state.selected = copy;
+  updatePropsPanel(); render();
+}
+
+function toggleSnap() {
+  state.snapEnabled = !state.snapEnabled;
+  const btn = document.getElementById('snap-toggle');
+  btn.classList.toggle('on', state.snapEnabled);
+  btn.title = state.snapEnabled ? 'Grid snap ON (click to disable)' : 'Grid snap OFF (click to enable)';
+  showToast('Grid snap ' + (state.snapEnabled ? 'ON' : 'OFF'));
+}
+
+// ════════════════════════════════════════════
+// ZOOM
+// ════════════════════════════════════════════
+function zoom(factor) {
+  const cx = canvas.width/2, cy = canvas.height/2;
+  const wx = (cx - state.pan.x) / state.scale;
+  const wy = (cy - state.pan.y) / state.scale;
+  state.scale = Math.min(3, Math.max(0.2, state.scale * factor));
+  state.pan.x = cx - wx * state.scale;
+  state.pan.y = cy - wy * state.scale;
+  render();
+}
+function resetZoom() { centerRoom(); render(); }
+
+// ════════════════════════════════════════════
+// ROOM SIZE
+// ════════════════════════════════════════════
+function updateRoomSize() {
+  const w = +document.getElementById('roomW').value;
+  const h = +document.getElementById('roomH').value;
+  document.getElementById('wVal').textContent = w;
+  document.getElementById('hVal').textContent = h;
+  document.getElementById('roomDimsDisplay').textContent = `${w} × ${h}`;
+  state.room.w = w; state.room.h = h;
+  centerRoom();
+  render();
+}
+
+// ════════════════════════════════════════════
+// MODALS
+// ════════════════════════════════════════════
+function openNewRoom() {
+  document.getElementById('newRoomModal').classList.add('open');
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+function createNewRoom() {
+  const name = document.getElementById('modalRoomName').value || 'New Room';
+  const w = +document.getElementById('modalW').value || 800;
+  const h = +document.getElementById('modalH').value || 600;
+  document.getElementById('roomNameInput').value = name;
+  document.getElementById('roomW').value = w;
+  document.getElementById('roomH').value = h;
+  document.getElementById('wVal').textContent = w;
+  document.getElementById('hVal').textContent = h;
+  document.getElementById('roomDimsDisplay').textContent = `${w} × ${h}`;
+  state.room.w = w; state.room.h = h;
+  state.items = [];
+  state.selected = null;
+  closeModal('newRoomModal');
+  centerRoom();
+  updatePropsPanel();
+  render();
+  showToast('New room created');
+}
+function clearAll() {
+  if (state.items.length === 0) return;
+  state.items = [];
+  state.selected = null;
+  updatePropsPanel();
+  render();
+  showToast('Room cleared');
+}
+document.querySelector('.modal-backdrop').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeModal('newRoomModal');
+});
+
+// ════════════════════════════════════════════
+// EXPORT PNG
+// ════════════════════════════════════════════
+function exportPNG() {
+  const SCALE  = 2;
+  const MARGIN = 48;
+  const rw = state.room.w, rh = state.room.h;
+
+  const offscreen = document.createElement('canvas');
+  offscreen.width  = (rw + MARGIN * 2) * SCALE;
+  offscreen.height = (rh + MARGIN * 2) * SCALE;
+  const oc = offscreen.getContext('2d');
+
+  // ── Swap the module-level ctx so all drawXxx() functions render onto oc ──
+  const realCtx  = ctx;
+  const realPan  = { ...state.pan };
+  const realScale = state.scale;
+  const realSel  = state.selected;
+
+  ctx           = oc;
+  state.pan     = { x: MARGIN * SCALE, y: MARGIN * SCALE };
+  state.scale   = SCALE;
+  state.selected = null;
+
+  // Resize offscreen canvas reference so render() uses correct dimensions
+  const realCW = canvas.width, realCH = canvas.height;
+  // We don't touch canvas.width/height — render() uses ctx (now oc) directly
+
+  // Outer background
+  oc.fillStyle = '#b8b0a0';
+  oc.fillRect(0, 0, offscreen.width, offscreen.height);
+
+  // Shadow behind room
+  oc.save();
+  oc.shadowColor = 'rgba(26,20,16,0.3)';
+  oc.shadowBlur  = 20 * SCALE;
+  oc.shadowOffsetX = 5 * SCALE;
+  oc.shadowOffsetY = 5 * SCALE;
+  oc.fillStyle = '#f5f0e8';
+  oc.fillRect(MARGIN * SCALE, MARGIN * SCALE, rw * SCALE, rh * SCALE);
+  oc.restore();
+
+  // Draw room contents (floor, grid, items, border) using the swapped ctx
+  oc.save();
+  oc.translate(state.pan.x, state.pan.y);
+  oc.scale(state.scale, state.scale);
+  drawFloor();
+  drawGrid();
+  oc.strokeStyle = '#1a1410'; oc.lineWidth = 3;
+  oc.strokeRect(0, 0, rw, rh);
+  drawCorners();
+  const sorted = [...state.items].sort((a, b) => a.y - b.y);
+  for (const item of sorted) drawItem(item, false);
+  // Room name watermark
+  oc.save();
+  oc.font = 'italic 14px "Georgia", serif';
+  oc.fillStyle = 'rgba(122,106,90,0.4)';
+  oc.textAlign = 'right';
+  oc.fillText(document.getElementById('roomNameInput').value.toUpperCase(), rw - 14, rh - 12);
+  oc.restore();
+  // Branding
+  oc.save();
+  oc.font = '500 10px "DM Mono", monospace';
+  oc.fillStyle = 'rgba(122,106,90,0.5)';
+  oc.textAlign = 'left';
+  oc.fillText('OLIVE TREE EVENT PLANNER', 14, rh - 12);
+  oc.restore();
+  oc.restore();
+
+  // ── Restore module-level state ──
+  ctx            = realCtx;
+  state.pan      = realPan;
+  state.scale    = realScale;
+  state.selected = realSel;
+
+  // Download
+  const planName = (document.getElementById('roomNameInput').value || 'seating-plan')
+    .replace(/\s+/g, '-').toLowerCase();
+  const link = document.createElement('a');
+  link.download = planName + '.png';
+  link.href = offscreen.toDataURL('image/png');
+  link.click();
+  showToast('PNG exported!');
+}
+
+// ════════════════════════════════════════════
+// TOAST
+// ════════════════════════════════════════════
+let toastTimer;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+// ════════════════════════════════════════════
+// ROOM NAME LIVE UPDATE
+// ════════════════════════════════════════════
+document.getElementById('roomNameInput').addEventListener('input', render);
+
+// ════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════
+updateStats();
+updatePropsPanel();
+
+// Add a few starter items
+function addStarter() {
+  const items = [
+    createItem('table-round', 100, 80),
+    createItem('table-round', 280, 80),
+    createItem('table-rect', 480, 100),
+    createItem('table-long', 100, 280),
+    createItem('plant', 680, 50),
+    createItem('plant', 680, 480),
+    createItem('bar', 500, 450),
+  ];
+  // Add some chairs around first round table
+  const rt = items[0];
+  const angles = [0, 60, 120, 180, 240, 300];
+  angles.forEach(deg => {
+    const rad = deg * Math.PI/180;
+    const chair = createItem('chair', rt.x + rt.w/2 + Math.cos(rad)*68 - 20, rt.y + rt.h/2 + Math.sin(rad)*68 - 22);
+    chair.rot = deg + 90;
+    items.push(chair);
+  });
+  // Chairs around second round table
+  const rt2 = items[1];
+  [0,72,144,216,288].forEach(deg => {
+    const rad = deg * Math.PI/180;
+    const chair = createItem('chair', rt2.x + rt2.w/2 + Math.cos(rad)*64 - 20, rt2.y + rt2.h/2 + Math.sin(rad)*64 - 22);
+    chair.rot = deg + 90;
+    items.push(chair);
+  });
+  // Chairs around rect table
+  [0,1].forEach(side => {
+    [0,1,2,3].forEach(pos => {
+      const chair = createItem('chair', items[2].x + 12 + pos * 28, items[2].y + (side === 0 ? -46 : items[2].h + 4));
+      chair.rot = side === 0 ? 0 : 180;
+      items.push(chair);
+    });
+  });
+  state.items = items;
+  render();
+  updateStats();
+}
+addStarter();
+
+// Init snap button visual state
+document.getElementById('snap-toggle').classList.add('on');
+</script>
+</body>
+</html>
