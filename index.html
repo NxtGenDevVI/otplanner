@@ -549,6 +549,7 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-.49-4"/></svg>
           </button>
         </div>
+        <span data-single style="display:contents">
         <div class="itb-sep"></div>
         <span class="itb-label">W</span>
         <div class="itb-grp">
@@ -569,6 +570,7 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           </button>
         </div>
+        </span>
         <div class="itb-sep"></div>
         <button class="itb-btn" onclick="tbDuplicate()" title="Duplicate (D)">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
@@ -1466,7 +1468,7 @@ document.querySelectorAll('.furniture-item').forEach(el => {
         const def = FURNITURE[type];
         const item = createItem(type, w.x - def.w/2, w.y - def.h/2);
         state.items.push(item);
-        state.selected = item;
+        setSelection([item]);
         updatePropsPanel();
         render();
         showToast(def.label + ' placed');
@@ -1759,7 +1761,7 @@ function updateItemToolbar() {
   // For multi-select hide the W/H resize buttons (makes no sense for mixed items)
   const multi = sel.length > 1;
   tb.querySelectorAll('[data-single]').forEach(el => {
-    el.style.display = multi ? 'none' : '';
+    el.style.display = multi ? 'none' : 'contents';
   });
 
   tb.style.left = px + 'px';
@@ -1848,7 +1850,7 @@ function createNewRoom() {
   document.getElementById('roomDimsDisplay').textContent = `${w} × ${h}`;
   state.room.w = w; state.room.h = h;
   state.items = [];
-  state.selected = null;
+  clearSelection();
   closeModal('newRoomModal');
   centerRoom();
   updatePropsPanel();
@@ -1858,7 +1860,7 @@ function createNewRoom() {
 function clearAll() {
   if (state.items.length === 0) return;
   state.items = [];
-  state.selected = null;
+  clearSelection();
   updatePropsPanel();
   render();
   showToast('Room cleared');
