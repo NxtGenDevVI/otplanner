@@ -1484,72 +1484,11 @@ document.querySelectorAll('.furniture-item').forEach(el => {
 // ════════════════════════════════════════════
 // MOUSE INTERACTION ON CANVAS
 // ════════════════════════════════════════════
-canvas.addEventListener('mousedown', e => {
-  if (e.button === 1 || (e.button === 0 && e.altKey)) {
-    state.panDragging = true;
-    state.panStart  = { x: e.clientX, y: e.clientY };
-    state.panOrigin = { ...state.pan };
-    canvas.style.cursor = 'grabbing';
-    return;
-  }
-  const pos = canvasPos(e);
-  const w   = toWorld(pos.x, pos.y);
 
-  // ── Resize handle on the single selected item? ──
-  if (state.selection.size === 1) {
-    const handleHit = getHandleAt(w.x, w.y);
-    if (handleHit) {
-      const it = handleHit.item;
-      state.resizing = {
-        handle:     handleHit.key,
-        origCX:     it.x + it.w / 2,
-        origCY:     it.y + it.h / 2,
-        origHW:     it.w / 2,
-        origHH:     it.h / 2,
-        startLocal: worldToItemLocal(w.x, w.y, it),
-      };
-      canvas.style.cursor = HANDLE_DEFS[handleHit.key].cursor;
-      return;
-    }
-  }
-
-  const hit = getItemAt(w.x, w.y);
-
-  if (hit) {
-    if (e.shiftKey) {
-      // Shift-click: toggle membership
-      if (state.selection.has(hit.id)) {
-        removeFromSelection(hit);
-      } else {
-        addToSelection(hit);
-      }
-      updatePropsPanel();
-      render();
-      return;
-    }
-
-    // Plain click: if item already in selection, keep group and start drag.
-    // If not in selection, replace selection with just this item.
-    if (!state.selection.has(hit.id)) {
-      setSelection([hit]);
-    }
-
-    // Start group drag for ALL selected items
-    state.dragStart = { x: w.x, y: w.y };
-    state.dragGroup = selectionItems().map(it => ({ item: it, ox: it.x, oy: it.y }));
-    canvas.style.cursor = 'grabbing';
-    updatePropsPanel();
-    render();
-  } else {
-    // Click on empty space — clear selection and start lasso
-    if (!e.shiftKey) clearSelection();
-    state.lasso = { x1: w.x, y1: w.y, x2: w.x, y2: w.y };
-    updatePropsPanel();
-    render();
-  }
-});
-
-canvas.addEventListener('mousemove', e => {
+// Document-level handlers — registered on mousedown, removed on mouseup.
+// This ensures we never lose a drag even when the mouse leaves the canvas.
+function onDocMove(e) {
+  // ── Pan ──────────────────────────────────────────────────
   if (state.panDragging) {
     state.pan.x = state.panOrigin.x + (e.clientX - state.panStart.x);
     state.pan.y = state.panOrigin.y + (e.clientY - state.panStart.y);
@@ -1557,50 +1496,42 @@ canvas.addEventListener('mousemove', e => {
     return;
   }
 
-  // ── Resize ──────────────────────────────────────────
+  // ── Resize ───────────────────────────────────────────────
   if (state.resizing) {
     const pos = canvasPos(e);
     const w   = toWorld(pos.x, pos.y);
     const r   = state.resizing;
     const item = state.selected;
     const def  = HANDLE_DEFS[r.handle];
-
-    // Compute delta in item-local space (centre stays at origCX/CY)
     const currentLocal = worldToItemLocal(w.x, w.y, item);
     const dx = currentLocal.x - r.startLocal.x;
     const dy = currentLocal.y - r.startLocal.y;
-
     const MIN = 20;
     let newHW = r.origHW, newHH = r.origHH;
-
     if (item.type === 'table-round') {
-      // Round tables: keep square; use diagonal projection
-      const diag = def.sx * dx + def.sy * dy;
+      const diag  = def.sx * dx + def.sy * dy;
       const steps = (Math.abs(def.sx) + Math.abs(def.sy)) || 1;
       newHW = newHH = Math.max(MIN, r.origHW + diag / steps);
     } else {
       if (def.sx !== 0) newHW = Math.max(MIN, r.origHW + def.sx * dx);
       if (def.sy !== 0) newHH = Math.max(MIN, r.origHH + def.sy * dy);
     }
-
     item.w = newHW * 2;
     item.h = newHH * 2;
-    // Keep the visual centre fixed
     item.x = r.origCX - newHW;
     item.y = r.origCY - newHH;
-
     canvas.style.cursor = def.cursor;
     updatePropsPanel();
     render();
     return;
   }
 
-  // ── Group drag (move) ───────────────────────────────────
+  // ── Group drag ───────────────────────────────────────────
   if (state.dragGroup) {
     const pos = canvasPos(e);
     const w   = toWorld(pos.x, pos.y);
-    const dx = w.x - state.dragStart.x;
-    const dy = w.y - state.dragStart.y;
+    const dx  = w.x - state.dragStart.x;
+    const dy  = w.y - state.dragStart.y;
     const doSnap = state.snapEnabled !== e.shiftKey;
     state.dragGroup.forEach(({ item, ox, oy }) => {
       let nx = ox + dx, ny = oy + dy;
@@ -1609,11 +1540,10 @@ canvas.addEventListener('mousemove', e => {
       item.y = ny;
     });
     render();
-    updatePropsPanel();
     return;
   }
 
-  // ── Lasso ──────────────────────────────────────────────
+  // ── Lasso ────────────────────────────────────────────────
   if (state.lasso) {
     const pos = canvasPos(e);
     const w   = toWorld(pos.x, pos.y);
@@ -1622,54 +1552,120 @@ canvas.addEventListener('mousemove', e => {
     render();
     return;
   }
+}
 
-  // ── Cursor feedback ─────────────────────────────────────
-  const pos = canvasPos(e);
-  const w = toWorld(pos.x, pos.y);
-  if (state.selection.size === 1) {
-    const hh = getHandleAt(w.x, w.y);
-    if (hh) { canvas.style.cursor = HANDLE_DEFS[hh.key].cursor; return; }
-  }
-  canvas.style.cursor = getItemAt(w.x, w.y) ? 'grab' : 'default';
-});
-
-canvas.addEventListener('mouseup', e => {
-  // Finalise lasso selection
+function onDocUp(e) {
+  // Finalise lasso
   if (state.lasso) {
-    const l = state.lasso;
+    const l  = state.lasso;
     const x1 = Math.min(l.x1, l.x2), x2 = Math.max(l.x1, l.x2);
     const y1 = Math.min(l.y1, l.y2), y2 = Math.max(l.y1, l.y2);
-    const THRESH = 4 / state.scale; // ignore tiny accidental lassos
+    const THRESH = 4 / state.scale;
     if (x2 - x1 > THRESH || y2 - y1 > THRESH) {
       const inside = state.items.filter(it => {
-        const cx = it.x + it.w / 2, cy = it.y + it.h / 2;
+        const cx = it.x + it.w/2, cy = it.y + it.h/2;
         return cx >= x1 && cx <= x2 && cy >= y1 && cy <= y2;
       });
-      if (e.shiftKey) {
-        inside.forEach(it => addToSelection(it));
-      } else {
-        setSelection(inside);
-      }
+      if (e.shiftKey) inside.forEach(it => addToSelection(it));
+      else            setSelection(inside);
       updatePropsPanel();
     }
     state.lasso = null;
     render();
   }
-  state.dragging    = null;
+
+  // Reset all drag state
   state.dragGroup   = null;
   state.dragStart   = null;
   state.panDragging = false;
   state.resizing    = null;
   canvas.style.cursor = 'default';
+
+  // Detach until next dragstart
+  document.removeEventListener('mousemove', onDocMove);
+  document.removeEventListener('mouseup',   onDocUp);
+
   updateItemToolbar();
+}
+
+canvas.addEventListener('mousedown', e => {
+  if (e.button === 1 || (e.button === 0 && e.altKey)) {
+    state.panDragging = true;
+    state.panStart  = { x: e.clientX, y: e.clientY };
+    state.panOrigin = { ...state.pan };
+    canvas.style.cursor = 'grabbing';
+    document.addEventListener('mousemove', onDocMove);
+    document.addEventListener('mouseup',   onDocUp);
+    return;
+  }
+
+  const pos = canvasPos(e);
+  const w   = toWorld(pos.x, pos.y);
+
+  // ── Resize handle on single selected item? ───────────────
+  if (state.selection.size === 1) {
+    const handleHit = getHandleAt(w.x, w.y);
+    if (handleHit) {
+      const it = handleHit.item;
+      state.resizing = {
+        handle:     handleHit.key,
+        origCX:     it.x + it.w/2,
+        origCY:     it.y + it.h/2,
+        origHW:     it.w/2,
+        origHH:     it.h/2,
+        startLocal: worldToItemLocal(w.x, w.y, it),
+      };
+      canvas.style.cursor = HANDLE_DEFS[handleHit.key].cursor;
+      document.addEventListener('mousemove', onDocMove);
+      document.addEventListener('mouseup',   onDocUp);
+      return;
+    }
+  }
+
+  const hit = getItemAt(w.x, w.y);
+
+  if (hit) {
+    if (e.shiftKey) {
+      // Shift-click: toggle item in selection
+      if (state.selection.has(hit.id)) removeFromSelection(hit);
+      else                              addToSelection(hit);
+      updatePropsPanel();
+      render();
+      return;
+    }
+
+    // Replace selection if this item wasn't already selected
+    if (!state.selection.has(hit.id)) setSelection([hit]);
+
+    // Start group drag
+    state.dragStart = { x: w.x, y: w.y };
+    state.dragGroup = selectionItems().map(it => ({ item: it, ox: it.x, oy: it.y }));
+    canvas.style.cursor = 'grabbing';
+    updatePropsPanel();
+    render();
+    document.addEventListener('mousemove', onDocMove);
+    document.addEventListener('mouseup',   onDocUp);
+  } else {
+    // Empty space: clear selection and start lasso
+    if (!e.shiftKey) clearSelection();
+    state.lasso = { x1: w.x, y1: w.y, x2: w.x, y2: w.y };
+    updatePropsPanel();
+    render();
+    document.addEventListener('mousemove', onDocMove);
+    document.addEventListener('mouseup',   onDocUp);
+  }
 });
-canvas.addEventListener('mouseleave', () => {
-  state.dragging    = null;
-  state.dragGroup   = null;
-  state.dragStart   = null;
-  state.panDragging = false;
-  state.resizing    = null;
-  state.lasso       = null;
+
+// Canvas mousemove: cursor feedback only (actual drag is handled by onDocMove)
+canvas.addEventListener('mousemove', e => {
+  if (state.dragGroup || state.panDragging || state.resizing || state.lasso) return;
+  const pos = canvasPos(e);
+  const w   = toWorld(pos.x, pos.y);
+  if (state.selection.size === 1) {
+    const hh = getHandleAt(w.x, w.y);
+    if (hh) { canvas.style.cursor = HANDLE_DEFS[hh.key].cursor; return; }
+  }
+  canvas.style.cursor = getItemAt(w.x, w.y) ? 'grab' : 'default';
 });
 
 // Scroll to zoom
